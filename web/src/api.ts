@@ -51,3 +51,32 @@ export function plural(n: number, [one, few, many]: [string, string, string]): s
   const r = PR.select(n);
   return `${n} ${r === 'one' ? one : r === 'few' ? few : many}`;
 }
+
+// ── The shared table (mirrors server/table.ts) ─────────────────────────────
+export type Dish = 'olivier' | 'shuba' | 'tang' | 'caviar';
+export interface TableState {
+  portions: Record<Dish, number>;
+  plates: Record<number, Dish>;
+  champagne: 'closed' | 'open';
+  glasses: number[];
+  candles: [boolean, boolean];
+  tangerines: Record<number, number>;
+}
+export type TableAction =
+  | { kind: 'eat'; dish: Dish }
+  | { kind: 'pop' }
+  | { kind: 'clink' }
+  | { kind: 'throw'; target: number }
+  | { kind: 'candle'; index: 0 | 1 }
+  | { kind: 'cracker' }
+  | { kind: 'react'; emoji: string }
+  | { kind: 'tip'; target: number };
+export type Fx =
+  | { type: 'eat'; user: number; dish: Dish; refilled: boolean }
+  | { type: 'pop'; user: number }
+  | { type: 'clink'; user: number }
+  | { type: 'throw'; user: number; target: number }
+  | { type: 'candle'; user: number; index: number; lit: boolean }
+  | { type: 'cracker'; user: number }
+  | { type: 'react'; user: number; emoji: string }
+  | { type: 'tip'; user: number; target: number };

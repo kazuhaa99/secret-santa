@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError, fmtWhen, plural, type Lobby as LobbyData, type Me } from '../api';
+import { api, ApiError, plural, type Fx, type Lobby as LobbyData, type Me, type TableAction, type TableState } from '../api';
 import { Avatar } from '../components/Avatar';
+import { Coin } from '../components/Coin';
 import { Chat, type Message } from '../components/Chat';
-import { Countdown } from '../components/Countdown';
 import { burst } from '../components/Festive';
 import { Table } from '../components/Table';
 import { TextScramble } from '../components/text-scramble';
 import { Button, Notice } from '../components/ui';
+import { Tv } from '../components/Tv';
 import { Wheel } from '../components/Wheel';
+
+const REACTIONS = ['🥂', '🎄', '😂', '❤️', '🍊'];
 
 interface Slot {
   id: number;
@@ -36,6 +39,25 @@ export function Lobby({ me }: { me: Me }) {
   const [chatReady, setChatReady] = useState(false);
   const [said, setSaid] = useState<Record<number, { text: string; key: number }>>({});
   const lastId = useRef(0);
+  const [table, setTable] = useState<TableState | null>(null);
+  const [fx, setFx] = useState<{ id: number; fx: Fx }[]>([]);
+  const fxId = useRef(0);
+  const playFx = useCallback((f: Fx) => {
+    const id = ++fxId.current;
+    setFx((prev) => [...prev, { id, fx: f }]);
+    setTimeout(() => setFx((prev) => prev.filter((e) => e.id !== id)), 2600);
+  }, []);
+  const tableAct = useCallback((a: TableAction) => void api('/api/table', { method: 'POST', body: a }).catch(() => {}), []);
+  const [tipAim, setTipAim] = useState(false);
+  const [tipReadyAt, setTipReadyAt] = useState(0);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (tipReadyAt <= Date.now()) return;
+    const t = setInterval(() => tick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [tipReadyAt]);
+  const tipLeft = Math.max(0, Math.ceil((tipReadyAt - Date.now()) / 1000));
+  const toast = useCallback(() => void api('/api/toast', { method: 'POST' }).catch(() => {}), []);
 
   /** Adds messages from the server, by id, keeping the ones still being sent at the end. */
   const merge = useCallback((list: Message[]) => {
@@ -85,6 +107,13 @@ export function Lobby({ me }: { me: Me }) {
         merge([m]);
         setSaid((prev) => ({ ...prev, [m.userId]: { text: m.text, key: m.id } }));
       });
+      es.addEventListener('table', (e: MessageEvent<string>) => {
+        heard = Date.now();
+        const { state, fx: f } = JSON.parse(e.data) as { state: TableState; fx: Fx };
+        setTable(state);
+        playFx(f);
+        if (f.type === 'tip' && f.user === me.id) setTipReadyAt(Date.now() + 120_000);
+      });
       es.addEventListener('chat-delete', (e: MessageEvent<string>) => {
         const { id } = JSON.parse(e.data) as { id: number };
         setMessages((prev) => prev.filter((m) => m.id !== id));
@@ -93,6 +122,7 @@ export function Lobby({ me }: { me: Me }) {
         setLive(true);
         void catchUp();
         api<LobbyData>('/api/lobby').then(setLobby, () => {});
+        api<TableState>('/api/table').then(setTable, () => {});
       };
       es.onerror = () => setLive(false);
     };
@@ -116,7 +146,7 @@ export function Lobby({ me }: { me: Me }) {
       document.removeEventListener('visibilitychange', onVisible);
       es?.close();
     };
-  }, [catchUp, merge]);
+  }, [catchUp, merge, playFx, me.id]);
 
   /** The message shows up at once as "sending"; it is replaced by the stored one or marked failed. */
   const send = useCallback(
@@ -140,41 +170,61 @@ export function Lobby({ me }: { me: Me }) {
   if (!lobby) return <p className="px-5 py-16 text-center font-display text-2xl italic text-frost">Накрываем на стол…</p>;
 
   const here = lobby.participants.filter((p) => p.online).length;
+  const drawn = Boolean(lobby.drawnAt);
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-      <div className="space-y-8">
-        <header className="text-center">
-          <p className="label rise">Новогодний ужин</p>
-          <h1 className="rise mt-3 font-display text-[clamp(2.4rem,8vw,4rem)] font-medium leading-[1] tracking-[-0.01em]" style={{ ['--d' as string]: 1 }}>
-            {lobby.title}
-          </h1>
-          <p className="rise mt-3 font-display text-xl italic text-gold" style={{ ['--d' as string]: 2 }} aria-live="polite">
-            за столом {here} из {plural(lobby.participants.length, ['гостя', 'гостей', 'гостей'])}
-            {!live && <span className="font-sans text-sm not-italic text-frost"> · переподключаемся</span>}
-          </p>
-        </header>
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+      <div className="space-y-6">
+        <div className="rise">
+          <Tv title={drawn ? 'Жеребьёвка!' : lobby.title} drawAt={lobby.drawAt} drawn={drawn} />
+        </div>
+        <p className="text-center font-hand text-[26px] leading-tight text-gold [text-shadow:0_2px_6px_#000]" aria-live="polite">
+          за столом {here} из {plural(lobby.participants.length, ['гостя', 'гостей', 'гостей'])}
+          {!live && <span className="font-sans text-sm text-frost"> · переподключаемся</span>}
+        </p>
+        {lobby.drawError && (
+          <div className="mx-auto max-w-md">
+            <Notice tone="error">Жеребьёвка не состоялась: {lobby.drawError}</Notice>
+          </div>
+        )}
 
-        {lobby.drawnAt ? (
-          <Draw drawnAt={lobby.drawnAt} people={lobby.participants} meId={me.id} said={said} />
+        {drawn ? (
+          <Draw drawnAt={lobby.drawnAt!} people={lobby.participants} meId={me.id} said={said} />
         ) : (
           <>
-            <section aria-label="Обратный отсчёт" className="rise" style={{ ['--d' as string]: 3 }}>
-              {lobby.drawAt ? (
-                <>
-                  <p className="label mb-4 text-center">Колесо закрутится {fmtWhen(lobby.drawAt)}</p>
-                  <Countdown to={lobby.drawAt} />
-                </>
-              ) : (
-                <p className="mx-auto max-w-[40ch] text-center text-frost">Время жеребьёвки ещё не назначено. Как только организатор его выберет, здесь пойдёт обратный отсчёт.</p>
-              )}
-              {lobby.drawError && (
-                <div className="mx-auto mt-4 max-w-md">
-                  <Notice tone="error">Жеребьёвка не состоялась: {lobby.drawError}</Notice>
-                </div>
-              )}
-            </section>
-            <Table people={lobby.participants} meId={me.id} said={said} />
+            <Table people={lobby.participants} meId={me.id} said={said} table={table} fx={fx} onAct={tableAct} tipAim={tipAim} onTipDone={() => setTipAim(false)} />
+            {/* things to do at the table besides eating */}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {REACTIONS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => tableAct({ kind: 'react', emoji: e })}
+                  className="grid size-11 place-items-center rounded-full bg-cream text-xl shadow-[0_4px_0_#d9b98a] transition-transform active:translate-y-0.5 active:scale-95"
+                  aria-label={`Реакция ${e}`}
+                >
+                  {e}
+                </button>
+              ))}
+              <button type="button" onClick={() => tableAct({ kind: 'cracker' })} className="min-h-11 rounded-full bg-cream px-4 font-serif font-bold text-cloth shadow-[0_4px_0_#d9b98a] active:translate-y-0.5">
+                🎉 Хлопушка
+              </button>
+              <button
+                type="button"
+                disabled={tipLeft > 0}
+                onClick={() => setTipAim((a) => !a)}
+                aria-pressed={tipAim}
+                className={`flex min-h-11 items-center gap-1.5 rounded-full px-4 font-serif font-bold shadow-[0_4px_0_#7a4a00] active:translate-y-0.5 disabled:opacity-60 ${tipAim ? 'bg-[#ffcf3d] text-[#5a3200] ring-4 ring-gold/50' : 'bg-[linear-gradient(180deg,#fff2a8,#ffcf3d_45%,#e09b12)] text-[#5a3200]'}`}
+              >
+                <Coin className="size-5" /> {tipLeft > 0 ? `Типнуть через ${Math.floor(tipLeft / 60)}:${String(tipLeft % 60).padStart(2, '0')}` : tipAim ? 'Кого типнуть?' : 'Типнуть'}
+              </button>
+              <button type="button" onClick={toast} className="min-h-11 rounded-full bg-gold px-4 font-serif font-bold text-ink shadow-[0_4px_0_#c99a3c] active:translate-y-0.5">
+                🥂 Сказать тост
+              </button>
+            </div>
+            <p className="mx-auto max-w-[52ch] text-center font-serif text-[14px] italic text-frost">
+              Тапни по салату — положишь себе. По вазе с мандаринами, а потом по другу — кинешь. Шампанское открывается тапом по «Советскому», потом можно чокнуться своим бокалом. Свечи задуваются.
+            </p>
           </>
         )}
 
@@ -225,7 +275,7 @@ function Draw({
       <>
         <Table people={people} meId={meId} said={said} />
         <div className="mx-auto max-w-md text-center">
-          <h2 className="font-display text-3xl italic">Жеребьёвка прошла без тебя</h2>
+          <h2 className="font-display text-3xl">Жеребьёвка прошла без тебя</h2>
           <p className="mt-3 text-frost">Ты присоединился уже после неё. Напиши организатору: он может провести её заново.</p>
         </div>
       </>
@@ -242,21 +292,20 @@ function Draw({
       {data && phase === 'reveal' && (
         <div ref={card} className="mx-auto flex max-w-md flex-col items-center text-center" aria-live="polite">
           {/* an invitation card: ivory stock, gold hairline frame, the name set large */}
-          <div className="unfold relative w-full bg-[#fbf6ea] p-2 text-[#2a1d10] shadow-[0_40px_80px_-30px_#000]">
-            <div className="border border-gold-deep/60 px-6 pb-8 pt-7">
-              <p className="label !text-[#8a6a2c]">Тайный Санта</p>
-              <p className="mt-3 font-display text-xl italic text-[#5b4426]">ты даришь подарок</p>
+          <div className="unfold relative w-full rounded-lg bg-cream p-2.5 text-ink shadow-[0_40px_80px_-30px_#000]">
+            <div className="rounded border-[3px] border-double border-cloth px-6 pb-8 pt-7">
+              <p className="label !text-cloth">Тайный Санта · Сигаретка</p>
+              <p className="mt-2 font-hand text-[30px] text-cloth">ты даришь подарок</p>
               <Avatar
                 id={data.receiver.id}
                 name={data.receiver.name}
                 avatar={data.receiver.avatar}
-                className="mx-auto mt-5 size-28 text-4xl ring-1 ring-gold-deep ring-offset-[6px] ring-offset-[#fbf6ea]"
+                className="mx-auto mt-4 size-28 border-4 border-cream text-4xl shadow-[0_0_0_3px_#b8322a]"
               />
-              <h2 className="mt-5 font-display text-[clamp(2.4rem,10vw,3.4rem)] font-medium leading-[1] text-cloth-deep">
+              <h2 className="mt-4 font-display text-[clamp(2.6rem,11vw,3.6rem)] leading-[1.05] text-cloth">
                 <TextScramble key={run}>{data.receiver.name}</TextScramble>
               </h2>
-              <div className="mx-auto my-5 h-px w-16 bg-gold-deep/60" aria-hidden />
-              <p className="font-display text-lg italic text-[#5b4426]">Тсс… это секрет. Не выдай себя в Сигаретке.</p>
+              <p className="mt-4 font-hand text-[24px] leading-tight text-pine">Тсс… это секрет. Не проболтайся в Сигаретке!</p>
             </div>
           </div>
           <Button tone="ghost" className="mt-6" onClick={() => (setPhase('spin'), setRun((r) => r + 1))}>

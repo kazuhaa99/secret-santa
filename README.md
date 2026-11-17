@@ -10,7 +10,7 @@
 ## Стек
 
 Node 22 (TypeScript без сборки), Hono, встроенный `node:sqlite`, React + Vite + Tailwind v4, motion, canvas-confetti. Шрифты: Cormorant Garamond, Onest.
-Компоненты Sliding Number и Text Scramble — [motion-primitives](https://github.com/ibelick/motion-primitives) (MIT), они же на 21st.dev.
+Фото блюд — Unsplash (бесплатная лицензия), подгружаются с images.unsplash.com. Компоненты Sliding Number и Text Scramble — [motion-primitives](https://github.com/ibelick/motion-primitives) (MIT), они же на 21st.dev.
 
 ## Локально
 

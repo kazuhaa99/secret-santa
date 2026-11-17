@@ -3,10 +3,10 @@ import { useEffect, useMemo } from 'react';
 
 const R = 150;
 const SLICES = [
-  { fill: '#173a2c', ink: '#f4ecdc' },
-  { fill: '#f4ecdc', ink: '#3b2a18' },
-  { fill: '#5b1220', ink: '#f4ecdc' },
-  { fill: '#e9d9b0', ink: '#3b2a18' },
+  { fill: '#b8322a', ink: '#fff4dc' },
+  { fill: '#fff4dc', ink: '#7b2a24' },
+  { fill: '#2f5e3a', ink: '#fff4dc' },
+  { fill: '#ffd36b', ink: '#5a1a15' },
 ];
 const AVATAR_BG = ['#7a1a28', '#2d5c47', '#8a6a2c', '#2e3f6e', '#6b3b5e', '#4d5a2a'];
 
@@ -66,13 +66,13 @@ export function Wheel({ names, target, spin, onDone }: { names: Slot[]; target: 
         </defs>
         <circle r={R + 7} fill="#a6823d" />
         <circle r={R + 5} fill="#d8b56b" />
-        <circle r={R + 2} fill="#0c1b15" />
+        <circle r={R + 2} fill="#5a1a15" />
         {names.map((p, i) => {
           const s = SLICES[(n % 4 === 1 && i === n - 1 ? 1 : i) % 4]!;
           const mid = (i + 0.5) * seg;
           return (
             <g key={p.id}>
-              <path d={arc(i, n)} fill={s.fill} stroke="#d8b56b" strokeWidth="1" />
+              <path d={arc(i, n)} fill={s.fill} stroke="#fff4dc" strokeWidth="1.5" />
               <g transform={`rotate(${mid - 90}) translate(${R - face / 2 - 8} 0) rotate(90)`}>
                 <circle r={face / 2 + 1.5} fill="#d8b56b" />
                 {p.avatar ? (
@@ -85,10 +85,9 @@ export function Wheel({ names, target, spin, onDone }: { names: Slot[]; target: 
                 transform={`rotate(${mid - 90}) translate(${R - face - 16} 0)`}
                 textAnchor="end"
                 dominantBaseline="central"
-                fontSize={n > 10 ? 14 : 18}
-                fontFamily="Cormorant Garamond, serif"
-                fontStyle="italic"
-                fontWeight={600}
+                fontSize={n > 10 ? 11 : 14}
+                fontFamily="PT Serif, serif"
+                fontWeight={700}
                 fill={s.ink}
               >
                 {short(p.name)}
@@ -98,7 +97,7 @@ export function Wheel({ names, target, spin, onDone }: { names: Slot[]; target: 
         })}
         {/* hub: a bauble */}
         <circle r={22} fill="#d8b56b" stroke="#a6823d" strokeWidth="2" />
-        <circle r={13} fill="#0c1b15" />
+        <circle r={13} fill="#b8322a" />
         <circle r={4} fill="#d8b56b" />
       </motion.svg>
     </div>

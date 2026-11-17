@@ -7,6 +7,7 @@ import { Avatars } from './avatars.ts';
 import { createInvite, hashPassword, verifyPassword } from './auth.ts';
 import { openDb, type Db, type User } from './db.ts';
 import { drawIsDue, runDraw, singleCycle } from './draw.ts';
+import { act as tableAct, freshTable } from './table.ts';
 import { avatarRequest, handleUpdate } from './telegram.ts';
 
 const SITE = 'https://santa.test';
@@ -229,6 +230,46 @@ describe('chat', () => {
     expect(newer.map((m) => m.text)).toEqual(['<b>второе</b>']);
     expect((await app.request(`/api/admin/chat/${first.id}`, { method: 'DELETE', headers: { cookie, origin: 'http://localhost' } })).status).toBe(403);
     expect((await app.request('/api/chat')).status).toBe(401);
+  });
+});
+
+describe('table', () => {
+  it('serves portions, refills, pops champagne for everyone and throws tangerines at guests only', () => {
+    const t = freshTable();
+    expect(tableAct(t, 1, { kind: 'eat', dish: 'caviar' }, [1, 2])).toMatchObject({ type: 'eat', refilled: false });
+    expect(t.plates[1]).toBe('caviar');
+    t.portions.caviar = 0;
+    expect(tableAct(t, 2, { kind: 'eat', dish: 'caviar' }, [1, 2])).toMatchObject({ refilled: true });
+    expect(() => tableAct(t, 1, { kind: 'clink' }, [1, 2])).toThrow(/шампанское/);
+    expect(tableAct(t, 1, { kind: 'pop' }, [1, 2]).type).toBe('pop');
+    expect(t.glasses).toEqual([1, 2]);
+    expect(tableAct(t, 2, { kind: 'pop' }, [1, 2]).type).toBe('clink');
+    expect(() => tableAct(t, 1, { kind: 'throw', target: 1 }, [1, 2])).toThrow();
+    expect(() => tableAct(t, 1, { kind: 'throw', target: 99 }, [1, 2])).toThrow();
+    tableAct(t, 1, { kind: 'throw', target: 2 }, [1, 2]);
+    expect(t.tangerines[2]).toBe(1);
+    expect(() => tableAct(t, 1, { kind: 'react', emoji: '<script>' }, [1, 2])).toThrow();
+    expect(tableAct(t, 1, { kind: 'tip', target: 2 }, [1, 2], 1_000).type).toBe('tip');
+    expect(() => tableAct(t, 1, { kind: 'tip', target: 2 }, [1, 2], 60_000)).toThrow(/через/);
+    expect(tableAct(t, 1, { kind: 'tip', target: 2 }, [1, 2], 121_001).type).toBe('tip');
+    expect(() => tableAct(t, 1, { kind: 'tip', target: 1 }, [1, 2], 999_999)).toThrow();
+  });
+
+  it('is reachable through the API and toasts land in the chat', async () => {
+    const { db, app } = setup();
+    const { cookie } = await login(app, 'anna', activate(db, addUser(db, 'anna'), 1));
+    const post = (path: string, body: object) =>
+      app.request(path, { method: 'POST', headers: { cookie, origin: 'http://localhost', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await post('/api/table', { kind: 'candle', index: 0 })).status).toBe(200);
+    expect((await post('/api/table', { kind: 'nope' })).status).toBe(400);
+    const borya = addUser(db, 'borya');
+    activate(db, borya, 2);
+    expect((await post('/api/table', { kind: 'tip', target: borya })).status).toBe(200);
+    expect((await post('/api/table', { kind: 'tip', target: borya })).status).toBe(400);
+    const chat = (await (await app.request('/api/chat', { headers: { cookie } })).json()) as { kind: string; text: string }[];
+    expect(chat.at(-1)).toMatchObject({ kind: 'tip', text: 'BORYA' });
+    const toast = (await (await post('/api/toast', {})).json()) as { text: string };
+    expect(toast.text).toMatch(/^🥂 /);
   });
 });
 

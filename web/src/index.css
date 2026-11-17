@@ -1,39 +1,48 @@
 @import 'tailwindcss';
-@import '@fontsource/cormorant-garamond/cyrillic-500.css';
-@import '@fontsource/cormorant-garamond/cyrillic-500-italic.css';
-@import '@fontsource/cormorant-garamond/cyrillic-600.css';
-@import '@fontsource/cormorant-garamond/latin-500.css';
-@import '@fontsource/cormorant-garamond/latin-500-italic.css';
-@import '@fontsource/cormorant-garamond/latin-600.css';
+@import '@fontsource/lobster/cyrillic-400.css';
+@import '@fontsource/lobster/latin-400.css';
+@import '@fontsource/pt-serif/cyrillic-400.css';
+@import '@fontsource/pt-serif/cyrillic-400-italic.css';
+@import '@fontsource/pt-serif/cyrillic-700.css';
+@import '@fontsource/pt-serif/latin-400.css';
+@import '@fontsource/pt-serif/latin-400-italic.css';
+@import '@fontsource/pt-serif/latin-700.css';
+@import '@fontsource/marck-script/cyrillic-400.css';
+@import '@fontsource/marck-script/latin-400.css';
 @import '@fontsource-variable/onest';
 
 /*
- * New Year's Eve in a good restaurant: deep emerald velvet, champagne gold used sparingly,
- * ivory linen and porcelain, candlelight as the only warm light. Cormorant Garamond sets the
- * invitation voice, Onest carries everything practical.
+ * New Year at Granny's: burgundy wallpaper, a lace tablecloth, crystal salad bowls, the TV
+ * counting down like the Kremlin clock, tinsel. Lobster for the greeting card voice, Marck Script
+ * for hand-written names, PT Serif for labels, Onest for everything you read.
  */
 @theme {
-  --color-night: #07110d;
-  --color-night-2: #0c1b15;
-  --color-night-3: #13281f;
-  --color-line: #284035;
-  --color-snow: #f4ecdc;
-  --color-frost: #a7b5aa;
-  --color-gold: #d8b56b;
-  --color-gold-deep: #a6823d;
-  --color-cloth: #7a1a28;
-  --color-cloth-deep: #5b1220;
-  --color-pine: #2d5c47;
-  --color-pine-deep: #1d4434;
-  --color-candle: #ffcf86;
-  --color-danger: #efa293;
+  --color-night: #5e1d19;
+  --color-night-2: #6c241f;
+  --color-night-3: #7d2e27;
+  --color-line: #9a4a3e;
+  --color-snow: #fff4dc;
+  --color-frost: #f1cfa6;
+  --color-gold: #ffd36b;
+  --color-gold-deep: #c99a3c;
+  --color-cloth: #7b2a24;
+  --color-cloth-deep: #5a1a15;
+  --color-pine: #2f5e3a;
+  --color-pine-deep: #1f4128;
+  --color-cream: #fff7e6;
+  --color-paper: #f1e2c3;
+  --color-ink: #3a1e12;
+  --color-wood: #6b4423;
+  --color-crystal: #3b6fb6;
+  --color-danger: #ffd0c4;
 
-  --font-display: 'Cormorant Garamond', Georgia, serif;
-  --font-hand: 'Cormorant Garamond', Georgia, serif;
+  --font-display: 'Lobster', cursive;
+  --font-hand: 'Marck Script', cursive;
+  --font-serif: 'PT Serif', Georgia, serif;
   --font-sans: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
 }
 
 :root {
@@ -60,15 +69,15 @@ p {
 
 ::selection {
   background: var(--color-gold);
-  color: var(--color-night);
+  color: var(--color-ink);
 }
 ::placeholder {
-  color: #74857a;
+  color: #a08560;
 }
 :focus-visible {
-  outline: 1.5px solid var(--color-gold);
+  outline: 2px solid var(--color-gold);
   outline-offset: 3px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 * {
   scrollbar-color: var(--color-line) transparent;
@@ -78,90 +87,139 @@ p {
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Small caps label, spaced like a printed menu. */
 .label {
-  font-size: 11px;
-  letter-spacing: 0.22em;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--color-frost);
 }
 
-/* ── Room: velvet with a pool of warm light and film grain ─────────────── */
+/* ── Granny's room: striped flock wallpaper, dark corners ──────────────── */
 .room {
-  background:
-    radial-gradient(80% 60% at 50% 38%, #1c3a2c 0%, transparent 70%),
-    radial-gradient(140% 100% at 50% 0%, #0f2219 0%, #07110d 70%);
+  background-color: #7b2a24;
+  background-image:
+    radial-gradient(circle at 25% 25%, #ffffff10 2px, transparent 3px),
+    radial-gradient(circle at 75% 75%, #ffffff10 2px, transparent 3px),
+    repeating-linear-gradient(90deg, #00000016 0 28px, transparent 28px 56px);
+  background-size:
+    56px 56px,
+    56px 56px,
+    auto;
 }
-.grain::after {
+.room::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 50;
-  opacity: 0.07;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background: radial-gradient(90% 80% at 50% 45%, transparent 45%, #1a0806d9);
 }
 
-/* Out-of-focus lights of the room behind us. */
-.bokeh {
+/* Tinsel along the top edge. */
+.tinsel {
   position: absolute;
-  border-radius: 9999px;
-  filter: blur(34px);
-  animation: bokeh 16s ease-in-out infinite alternate;
-  animation-delay: calc(var(--i) * -2.3s);
+  inset: 0 0 auto;
+  height: 34px;
+  background:
+    repeating-radial-gradient(circle at 10px -10px, #ffd36b 0 2px, #e2383f 3px 4px, transparent 5px 14px),
+    repeating-radial-gradient(circle at 4px -4px, #c6d9e6 0 1px, transparent 2px 9px);
+  filter: drop-shadow(0 2px 2px #0008);
+  pointer-events: none;
 }
-@keyframes bokeh {
-  to {
-    transform: translate3d(12px, -10px, 0) scale(1.08);
-    opacity: 0.12;
+
+/* The TV: wooden case, curved glass, scanlines. */
+.tv-screen {
+  background: radial-gradient(120% 100% at 50% 40%, #2d3b4a, #0b1218);
+  box-shadow: inset 0 0 40px #000;
+}
+.tv-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, #ffffff08 0 2px, transparent 2px 4px);
+}
+.tv-glow {
+  text-shadow: 0 0 18px #ffcf8a88;
+}
+.tv-digits {
+  text-shadow: 0 0 14px #9fd3ff;
+}
+
+/* Crystal salad bowls: faceted rim. */
+.crystal {
+  background: conic-gradient(from 0deg, #dfe9ee, #ffffff, #b9ccd4, #ffffff, #cfdde3, #ffffff, #b9ccd4, #dfe9ee);
+}
+
+/* Lace edge on the tablecloth. */
+.lace {
+  outline: 10px dotted #fffaf0;
+  outline-offset: -2px;
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────── */
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    filter: blur(5px);
   }
 }
-
-/* ── Candles: the one warm, living light on the table ───────────────────── */
-.flicker {
-  animation: flicker 3.2s ease-in-out infinite;
-  animation-delay: calc(var(--i, 0) * -0.7s);
+/* Starts visible (offset + blur only): nothing stays hidden if an animation stalls. */
+.rise {
+  animation: rise 800ms var(--ease-out) both;
+  animation-delay: calc(var(--d, 0) * 100ms);
 }
+
 @keyframes flicker {
   0%,
   100% {
-    opacity: 0.95;
+    opacity: 1;
     transform: scale(1);
   }
-  30% {
+  40% {
     opacity: 0.8;
-    transform: scale(0.97, 1.03);
+    transform: scale(0.92, 1.06);
   }
-  55% {
+  70% {
+    opacity: 0.95;
+    transform: scale(1.04, 0.96);
+  }
+}
+.flicker {
+  animation: flicker 2.6s ease-in-out infinite;
+}
+
+/* A guest who just took something: a little hop. */
+@keyframes hop {
+  30% {
+    transform: translateY(-10%) scale(1.06);
+  }
+}
+.hop {
+  animation: hop 500ms var(--ease-spring);
+}
+
+/* Floating reaction / chat line above a seat. */
+@keyframes float-up {
+  0% {
+    transform: translate(-50%, 8px) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, 0) scale(1.1);
     opacity: 1;
-    transform: scale(1.02, 0.98);
   }
-  80% {
-    opacity: 0.86;
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -46px) scale(1);
+    opacity: 0;
   }
 }
-
-/* ── Guests ─────────────────────────────────────────────────────────────── */
-.guest {
-  transition:
-    transform 700ms var(--ease-spring),
-    filter 600ms var(--ease-out),
-    opacity 600ms var(--ease-out);
+.float-up {
+  animation: float-up 2.2s var(--ease-out) forwards;
 }
-.guest[data-here='false'] {
-  transform: scale(0.86);
-  filter: grayscale(1) brightness(0.7);
-  opacity: 0.55;
-}
-.chair {
-  transition: transform 700ms var(--ease-out);
-}
-.chair[data-here='false'] {
-  transform: translateY(var(--push, 0));
-}
-
-/* A line of table talk floats up above the speaker for a moment. */
 @keyframes say {
   0% {
     transform: translate(-50%, 6px) scale(0.9);
@@ -181,16 +239,31 @@ p {
   animation: say 5s var(--ease-out) forwards;
 }
 
-@keyframes rise {
-  from {
-    transform: translateY(14px);
-    filter: blur(5px);
+/* Glasses meeting: a quick ring of sparks. */
+@keyframes clink {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
   }
 }
-/* Starts visible (offset + blur only): nothing stays hidden if an animation stalls. */
-.rise {
-  animation: rise 900ms var(--ease-out) both;
-  animation-delay: calc(var(--d, 0) * 110ms);
+.clink-ring {
+  animation: clink 700ms var(--ease-out) forwards;
+}
+
+@keyframes wobble {
+  25% {
+    transform: translate(-50%, -50%) rotate(-6deg);
+  }
+  75% {
+    transform: translate(-50%, -50%) rotate(6deg);
+  }
+}
+.wobble {
+  animation: wobble 400ms ease-in-out;
 }
 
 @keyframes unfold {
@@ -201,7 +274,7 @@ p {
 }
 .unfold {
   transform-origin: 50% 0;
-  animation: unfold 1100ms var(--ease-out) both;
+  animation: unfold 1000ms var(--ease-out) both;
 }
 
 @keyframes drift {
@@ -216,16 +289,15 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bokeh,
-  .flicker,
-  .say,
   .rise,
+  .flicker,
+  .hop,
+  .float-up,
+  .say,
+  .clink-ring,
+  .wobble,
   .unfold,
   .drift {
     animation: none;
-  }
-  .guest,
-  .chair {
-    transition: none;
   }
 }

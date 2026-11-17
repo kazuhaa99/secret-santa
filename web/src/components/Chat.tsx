@@ -1,6 +1,7 @@
 import { MessageCircle, SendHorizontal, Trash2, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { Avatar } from './Avatar';
+import { Coin } from './Coin';
 import { cn } from './ui';
 
 export interface Message {
@@ -9,6 +10,8 @@ export interface Message {
   name: string;
   avatar: number | null;
   text: string;
+  /** 'tip': text holds the name of whoever was tipped */
+  kind?: 'text' | 'tip';
   at: number;
   /** only on this device, until the server confirms */
   status?: 'sending' | 'failed';
@@ -60,22 +63,32 @@ function Thread({
         aria-live="polite"
         aria-label="Сообщения"
       >
-        {messages.length === 0 && <li className="py-8 text-center font-display text-lg italic text-frost">Пока тихо. Скажи тост первым.</li>}
+        {messages.length === 0 && <li className="py-8 text-center font-hand text-2xl text-[#a08560]">Пока тихо. Скажи тост первым.</li>}
         {messages.map((m) => {
           const mine = m.userId === meId;
+          if (m.kind === 'tip')
+            return (
+              <li key={m.id} className="flex items-center justify-center gap-2 py-1 text-[14px]">
+                <Coin className="size-5" />
+                <span>
+                  <b>{m.name}</b> <span className="font-semibold uppercase tracking-wide text-[#b8860b]">tipped</span> <b>{m.text}</b>
+                </span>
+                <time className="text-[11px] opacity-60 tnum">{time(m.at)}</time>
+              </li>
+            );
           return (
             <li key={m.id} className={cn('group flex items-end gap-2', mine && 'flex-row-reverse')}>
               <Avatar id={m.userId} name={m.name} avatar={m.avatar} className="size-7 shrink-0 text-[11px]" />
               <div
                 className={cn(
                   'max-w-[78%] rounded-2xl px-3 py-2 transition-opacity',
-                  mine ? 'rounded-br-sm bg-[#e9dcc0] text-night' : 'rounded-bl-sm bg-night-3 text-snow',
+                  mine ? 'rounded-br-sm bg-cloth text-cream' : 'rounded-bl-sm bg-paper text-ink',
                   m.status === 'sending' && 'opacity-60',
                   m.status === 'failed' && 'ring-1 ring-danger',
                 )}
               >
-                <p className={cn('mb-0.5 flex items-baseline gap-2 text-[12px]', mine ? 'text-[#6b5530]' : 'text-frost')}>
-                  {!mine && <span className="font-display text-[15px] italic text-gold">{m.name}</span>}
+                <p className={cn('mb-0.5 flex items-baseline gap-2 text-[12px]', mine ? 'text-cream/70' : 'text-[#8a6a4a]')}>
+                  {!mine && <span className="font-serif text-[13px] italic text-cloth">{m.name}</span>}
                   {m.status === 'sending' ? <span>отправляется…</span> : m.status === 'failed' ? null : <time className="tnum">{time(m.at)}</time>}
                   {canDelete && m.id > 0 && (
                     <button type="button" onClick={() => onDelete(m.id)} className="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100" aria-label="Удалить сообщение">
@@ -97,19 +110,19 @@ function Thread({
           );
         })}
       </ol>
-      <form onSubmit={submit} className="flex items-center gap-2 border-t border-line px-3 py-3">
+      <form onSubmit={submit} className="flex items-center gap-2 border-t border-dashed border-[#d9b98a] px-3 py-3">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={500}
           placeholder="Сказать что-нибудь за столом…"
           aria-label="Сообщение"
-          className="min-h-11 min-w-0 flex-1 rounded-full border border-line bg-night px-4 text-[15px] text-snow outline-none transition-colors focus:border-gold"
+          className="min-h-11 min-w-0 flex-1 rounded-full border border-[#d9b98a] bg-white/70 px-4 text-[15px] text-ink outline-none transition-colors focus:border-cloth"
         />
         <button
           type="submit"
           disabled={!text.trim()}
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-[linear-gradient(180deg,#e6c77f,#c9a456)] text-night transition-[transform,filter] active:scale-95 disabled:opacity-40"
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-cloth text-cream transition-[transform,filter] active:scale-95 disabled:opacity-40"
           aria-label="Отправить"
         >
           <SendHorizontal className="size-[18px]" aria-hidden />
@@ -152,11 +165,11 @@ export function Chat({
     return () => removeEventListener('keydown', onKey);
   }, [open]);
 
-  const panel = 'overflow-hidden rounded-3xl border border-line bg-night-2/90 shadow-[0_30px_60px_-30px_#000]';
+  const panel = 'overflow-hidden rounded-[20px] border-[6px] border-[#e9d4a8] bg-cream text-ink shadow-[0_30px_60px_-20px_#000]';
   const head = (
-    <div className="flex items-center justify-between border-b border-line px-4 py-3">
-      <h2 className="font-display text-xl italic">Разговоры за столом</h2>
-      <button type="button" onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-full text-frost hover:text-snow lg:hidden" aria-label="Закрыть чат">
+    <div className="flex items-center justify-between border-b border-dashed border-[#d9b98a] px-4 py-2.5">
+      <h2 className="font-hand text-[28px] text-cloth">Болтаем за столом</h2>
+      <button type="button" onClick={() => setOpen(false)} className="grid size-9 place-items-center rounded-full text-cloth/70 hover:text-cloth lg:hidden" aria-label="Закрыть чат">
         <X className="size-5" aria-hidden />
       </button>
     </div>
@@ -174,7 +187,7 @@ export function Chat({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-[linear-gradient(180deg,#e6c77f,#c9a456)] py-3 pl-4 pr-5 font-semibold text-night shadow-[0_12px_30px_-8px_#000] transition-transform active:scale-95 lg:hidden"
+        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-gold py-3 pl-4 pr-5 font-semibold text-ink shadow-[0_12px_30px_-8px_#000] transition-transform active:scale-95 lg:hidden"
         aria-label={unread ? `Чат, новых сообщений: ${unread}` : 'Чат'}
       >
         <MessageCircle className="size-5" aria-hidden /> Чат
@@ -183,7 +196,7 @@ export function Chat({
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Чат">
           <button type="button" className="absolute inset-0 bg-black/55" onClick={() => setOpen(false)} aria-label="Закрыть чат" />
-          <div className={cn(panel, 'absolute inset-x-2 bottom-2 flex h-[78dvh] flex-col bg-night-2')}>
+          <div className={cn(panel, 'absolute inset-x-2 bottom-2 flex h-[78dvh] flex-col')}>
             {head}
             <Thread {...props} />
           </div>

@@ -47,7 +47,7 @@ export function App() {
       <header className="flex items-center gap-3 py-4">
         <a href="/" onClick={go('/')} className="mr-auto flex items-center gap-2.5" aria-label="Сигаретка, в лобби">
           <Mark className="h-8 w-auto" smoke={false} />
-          <span className="hidden font-display text-2xl font-medium italic sm:inline">Сигаретка</span>
+          <span className="hidden font-display text-[28px] text-cream sm:inline">Сигаретка</span>
         </a>
         {me.isAdmin && (
           <nav className="flex">

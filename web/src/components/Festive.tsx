@@ -62,36 +62,20 @@ export function Snow() {
   return <canvas ref={ref} className="pointer-events-none fixed inset-0 z-0 size-full" aria-hidden />;
 }
 
-const LIGHTS = [
-  { x: '8%', y: '12%', s: 120, c: '#ffcf86' },
-  { x: '86%', y: '8%', s: 160, c: '#d8b56b' },
-  { x: '72%', y: '30%', s: 70, c: '#ffcf86' },
-  { x: '18%', y: '46%', s: 90, c: '#d8b56b' },
-  { x: '92%', y: '58%', s: 110, c: '#ffcf86' },
-  { x: '4%', y: '78%', s: 140, c: '#d8b56b' },
-];
-
-/** Velvet room, film grain, the blurred lights of the restaurant and a whisper of snow. */
+/** Granny's room: wallpaper, a vignette and tinsel along the top. */
 export function Scene({ children }: { children: ReactNode }) {
   return (
-    <div className="room grain relative min-h-dvh overflow-x-clip">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        {LIGHTS.map((l, i) => (
-          <span key={i} className="bokeh" style={{ left: l.x, top: l.y, width: l.s, height: l.s, background: l.c, opacity: 0.07, ['--i' as string]: i }} />
-        ))}
-      </div>
-      <Snow />
+    <div className="room relative min-h-dvh overflow-x-clip">
+      <div className="tinsel" aria-hidden />
       <div className="relative z-10">{children}</div>
     </div>
   );
 }
 
-/** Gold confetti for the reveal; loaded on demand, skipped under reduced motion. */
-export async function burst() {
+/** Paper confetti, like from a party cracker; loaded on demand, skipped under reduced motion. */
+export async function burst(at?: { x: number; y: number }) {
   if (reducedMotion()) return;
   const { default: confetti } = await import('canvas-confetti');
-  // Gold and ivory leaf only, falling slowly: a toast, not a carnival.
-  const opts = { colors: ['#d8b56b', '#f4ecdc', '#a6823d'], shapes: ['circle' as const], gravity: 0.5, decay: 0.93, scalar: 0.8, ticks: 260 };
-  confetti({ ...opts, particleCount: 90, spread: 100, startVelocity: 32, origin: { y: 0.45 } });
-  setTimeout(() => confetti({ ...opts, particleCount: 50, spread: 140, startVelocity: 20, origin: { y: 0.4 } }), 300);
+  const opts = { colors: ['#e2383f', '#ffd36b', '#2f8f5b', '#fff4dc', '#3b6fb6'], gravity: 0.8, ticks: 240 };
+  confetti({ ...opts, particleCount: 110, spread: 90, startVelocity: 40, origin: { x: at?.x ?? 0.5, y: at?.y ?? 0.45 } });
 }

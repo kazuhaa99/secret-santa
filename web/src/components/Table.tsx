@@ -1,324 +1,347 @@
-import type { ReactNode } from 'react';
-import type { Lobby } from '../api';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Dish, Fx, Lobby, TableAction, TableState } from '../api';
 import { Avatar } from './Avatar';
+import { Coin } from './Coin';
+import { burst } from './Festive';
 import { cn } from './ui';
 
 type Person = Lobby['participants'][number];
 
-/** Shared gradients for the china, crystal, brass and fruit. */
-function Defs() {
-  return (
-    <defs>
-      <radialGradient id="porcelain" cx="45%" cy="40%" r="60%">
-        <stop offset="0" stopColor="#ffffff" />
-        <stop offset="0.75" stopColor="#f3eee4" />
-        <stop offset="1" stopColor="#d9d1c2" />
-      </radialGradient>
-      <radialGradient id="charger" cx="40%" cy="35%" r="70%">
-        <stop offset="0" stopColor="#f0d48e" />
-        <stop offset="0.55" stopColor="#c59b4b" />
-        <stop offset="1" stopColor="#7e5e25" />
-      </radialGradient>
-      <radialGradient id="crystal" cx="38%" cy="32%" r="70%">
-        <stop offset="0" stopColor="#ffffff" stopOpacity="0.85" />
-        <stop offset="0.5" stopColor="#dfe8ea" stopOpacity="0.35" />
-        <stop offset="1" stopColor="#9fb3b6" stopOpacity="0.55" />
-      </radialGradient>
-      <radialGradient id="silver" cx="35%" cy="30%" r="75%">
-        <stop offset="0" stopColor="#ffffff" />
-        <stop offset="0.5" stopColor="#c9ced2" />
-        <stop offset="1" stopColor="#7c858c" />
-      </radialGradient>
-      <radialGradient id="tangerine" cx="35%" cy="30%" r="70%">
-        <stop offset="0" stopColor="#ffc06a" />
-        <stop offset="0.6" stopColor="#f08a1e" />
-        <stop offset="1" stopColor="#b85a08" />
-      </radialGradient>
-      <radialGradient id="beet" cx="45%" cy="40%" r="65%">
-        <stop offset="0" stopColor="#c03d73" />
-        <stop offset="1" stopColor="#6d1a3d" />
-      </radialGradient>
-      <radialGradient id="olivier" cx="45%" cy="40%" r="60%">
-        <stop offset="0" stopColor="#fbf2d6" />
-        <stop offset="1" stopColor="#e6d6a8" />
-      </radialGradient>
-      <radialGradient id="candlelight" r="0.5">
-        <stop offset="0" stopColor="#ffd89a" stopOpacity="0.75" />
-        <stop offset="0.4" stopColor="#ffcf86" stopOpacity="0.25" />
-        <stop offset="1" stopColor="#ffcf86" stopOpacity="0" />
-      </radialGradient>
-      <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
-        <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#3a2a12" floodOpacity="0.35" />
-      </filter>
-    </defs>
-  );
-}
+/** Top-down food photos (Unsplash licence), shown inside crystal bowls. */
+const U = (id: string) => `https://images.unsplash.com/photo-${id}?w=360&h=360&fit=crop&q=70&fm=webp`;
+export const FOOD: Record<Dish, { src: string; label: string }> = {
+  olivier: { src: U('1777994505589-75c2028c80fa'), label: 'оливье' },
+  shuba: { src: U('1762328845844-64b041d0c5f1'), label: 'шуба' },
+  tang: { src: U('1607116692929-ece4c84a5992'), label: 'мандарины' },
+  caviar: { src: U('1728335026927-8ee0382ada94'), label: 'икорка' },
+};
 
-/** A sprig of eucalyptus: thin stem, paired leaves. */
-function Sprig({ x, y, r = 0, s = 1 }: { x: number; y: number; r?: number; s?: number }) {
-  return (
-    <g transform={`translate(${x} ${y}) rotate(${r}) scale(${s})`}>
-      <path d="M-40 0C-20 -3 20 3 40 0" stroke="#5f7d68" strokeWidth="1.2" fill="none" />
-      {[-30, -18, -6, 6, 18, 30].map((d, i) => (
-        <g key={d}>
-          <ellipse cx={d} cy={-6} rx="4.5" ry="6.5" fill={i % 2 ? '#8fa996' : '#7b9784'} transform={`rotate(${-20 + i * 4} ${d} -6)`} />
-          <ellipse cx={d + 5} cy={6} rx="4.5" ry="6.5" fill={i % 2 ? '#7b9784' : '#8fa996'} transform={`rotate(${20 - i * 4} ${d + 5} 6)`} />
-        </g>
-      ))}
-    </g>
-  );
-}
-
-/** Olivier, herring under a fur coat, tangerines, caviar with blini, champagne on ice, candelabra. */
-function Feast() {
-  return (
-    <svg viewBox="0 0 420 260" className="size-full" aria-hidden>
-      <Defs />
-      {/* velvet runner */}
-      <rect x="0" y="104" width="420" height="52" rx="2" fill="#163a2b" />
-      <rect x="0" y="104" width="420" height="52" fill="none" stroke="#c59b4b" strokeWidth="1.2" strokeDasharray="1 3" opacity="0.8" />
-      <Sprig x={70} y={130} r={-6} />
-      <Sprig x={350} y={130} r={174} />
-
-      {/* candelabra: brass base and three candles with their light */}
-      <g transform="translate(210 130)">
-        <circle r="70" fill="url(#candlelight)" className="flicker" />
-        <ellipse rx="34" ry="9" fill="#a6823d" filter="url(#soft)" />
-        <path d="M-30 0H30" stroke="#d8b56b" strokeWidth="3" strokeLinecap="round" />
-        {[-26, 0, 26].map((x, i) => (
-          <g key={x} transform={`translate(${x} 0)`}>
-            <circle r="8" fill="url(#charger)" />
-            <circle r="5" fill="#fbf6ea" />
-            <g className="flicker" style={{ ['--i' as string]: i }}>
-              <circle r="9" fill="url(#candlelight)" />
-              <ellipse rx="2.2" ry="3.4" fill="#ffb54a" />
-              <ellipse rx="1" ry="1.8" fill="#fff4d6" />
-            </g>
-          </g>
-        ))}
-      </g>
-
-      {/* Olivier in a crystal bowl */}
-      <g transform="translate(118 62)" filter="url(#soft)">
-        <circle r="44" fill="url(#crystal)" stroke="#ffffff" strokeOpacity="0.6" strokeWidth="1.2" />
-        <circle r="36" fill="url(#olivier)" />
-        {Array.from({ length: 34 }, (_, i) => {
-          const a = i * 2.4;
-          const r = 4 + ((i * 7) % 28);
-          const fill = ['#5e9e3a', '#e8822c', '#e7b2a4', '#f3d35a'][i % 4];
-          return <rect key={i} x={r * Math.cos(a) - 2} y={r * Math.sin(a) - 2} width="4" height="4" rx="1.2" fill={fill} opacity="0.9" />;
-        })}
-        <path d="M-6 -10c4-5 9-1 6 3" stroke="#3f7a3a" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-        <ellipse cx="-16" cy="-24" rx="12" ry="5" fill="#fff" opacity="0.5" transform="rotate(-30 -16 -24)" />
-      </g>
-
-      {/* Herring under a fur coat on an oval dish */}
-      <g transform="translate(300 62)" filter="url(#soft)">
-        <ellipse rx="58" ry="40" fill="url(#porcelain)" />
-        <ellipse rx="58" ry="40" fill="none" stroke="#c59b4b" strokeWidth="1.5" />
-        <ellipse rx="42" ry="27" fill="#e9d9b6" />
-        <ellipse rx="40" ry="25" fill="url(#beet)" />
-        {[-22, -11, 0, 11, 22].map((x) => (
-          <path key={x} d={`M${x - 8} -18q8 18 16 36`} stroke="#fbf3e2" strokeWidth="1.2" fill="none" opacity="0.65" />
-        ))}
-        {Array.from({ length: 10 }, (_, i) => (
-          <path key={i} d={`M${-26 + i * 6} ${-6 + ((i * 11) % 14)}l3 -2`} stroke="#4f8a45" strokeWidth="1.3" strokeLinecap="round" />
-        ))}
-      </g>
-
-      {/* Tangerines in a brass bowl */}
-      <g transform="translate(118 200)" filter="url(#soft)">
-        <circle r="42" fill="url(#charger)" />
-        <circle r="35" fill="#8a6a2c" opacity="0.5" />
-        {[
-          [-13, -11],
-          [12, -13],
-          [0, 6],
-          [-16, 14],
-          [16, 12],
-        ].map(([x, y], i) => (
-          <g key={i} transform={`translate(${x} ${y})`}>
-            <circle r="12.5" fill="url(#tangerine)" />
-            <circle r="1.4" fill="#7a4a12" />
-            {i % 2 === 0 && <path d="M2 -9c6-6 12-3 13 1-5 3-10 3-13-1z" fill="#3f6b3e" />}
-          </g>
-        ))}
-      </g>
-
-      {/* Red caviar in a crystal rosette, blini around */}
-      <g transform="translate(300 200)" filter="url(#soft)">
-        {[0, 72, 144, 216, 288].map((a) => (
-          <g key={a} transform={`rotate(${a}) translate(34 0)`}>
-            <circle r="14" fill="#e8b46a" />
-            <circle r="11" fill="#f2c983" />
-          </g>
-        ))}
-        <circle r="22" fill="url(#crystal)" stroke="#fff" strokeOpacity="0.6" />
-        {Array.from({ length: 40 }, (_, i) => {
-          const a = i * 2.39996;
-          const r = 1.9 * Math.sqrt(i) * 1.7;
-          return (
-            <g key={i}>
-              <circle cx={r * Math.cos(a)} cy={r * Math.sin(a)} r="2.6" fill="#d6411f" />
-              <circle cx={r * Math.cos(a) - 0.8} cy={r * Math.sin(a) - 0.8} r="0.8" fill="#ffd3b8" />
-            </g>
-          );
-        })}
-      </g>
-
-      {/* Champagne on ice in a silver bucket */}
-      <g transform="translate(210 218)" filter="url(#soft)">
-        <circle r="30" fill="url(#silver)" />
-        <circle r="25" fill="#e9f1f3" opacity="0.6" />
-        {[
-          [-12, -10],
-          [12, -8],
-          [-10, 12],
-          [13, 11],
-          [0, -18],
-        ].map(([x = 0, y = 0], i) => (
-          <rect key={i} x={x - 5} y={y - 5} width="10" height="10" rx="2" fill="#ffffff" opacity="0.75" transform={`rotate(${i * 23} ${x} ${y})`} />
-        ))}
-        <circle r="11" fill="#173d2c" />
-        <circle r="7" fill="#d8b56b" />
-        <circle r="3" fill="#f6e3a8" />
-      </g>
-    </svg>
-  );
-}
-
-/** One place setting, drawn upright (the guest sits below it), rotated to face the guest. */
-function Setting({ angle }: { angle: number }) {
-  return (
-    <svg viewBox="-60 -60 120 120" className="size-full" style={{ transform: `rotate(${angle}deg)` }} aria-hidden>
-      <Defs />
-      <g filter="url(#soft)">
-        <circle r="40" fill="url(#charger)" />
-        <circle r="31" fill="url(#porcelain)" />
-        <circle r="31" fill="none" stroke="#c59b4b" strokeWidth="1" />
-        <circle r="22" fill="none" stroke="#e1d8c7" strokeWidth="1" />
-      </g>
-      {/* fork left, knife right */}
-      <rect x="-52" y="-24" width="3" height="48" rx="1.5" fill="url(#silver)" />
-      <path d="M-55 -24v-8M-52 -24v-8M-49 -24v-8M-46 -24v-8" stroke="#c9ced2" strokeWidth="1.2" strokeLinecap="round" transform="translate(2 0)" />
-      <rect x="47" y="-30" width="4" height="56" rx="2" fill="url(#silver)" />
-      {/* wine glass, top right */}
-      <circle cx="44" cy="-46" r="9" fill="url(#crystal)" stroke="#fff" strokeOpacity="0.7" />
-      <circle cx="44" cy="-46" r="5.5" fill="#8e2335" opacity="0.75" />
-    </svg>
-  );
+function usePortrait() {
+  const q = '(max-width: 639px)';
+  const [p, setP] = useState(() => matchMedia(q).matches);
+  useEffect(() => {
+    const m = matchMedia(q);
+    const on = () => setP(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return p;
 }
 
 function around(i: number, n: number, rx: number, ry: number) {
   const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-  return { x: 50 + rx * Math.cos(a), y: 50 + ry * Math.sin(a), deg: (a * 180) / Math.PI };
+  return { x: 50 + rx * Math.cos(a), y: 50 + ry * Math.sin(a) };
+}
+
+/** A tangerine flying across the table along an arc. */
+function Flying({ from, to }: { from: { x: number; y: number }; to: { x: number; y: number } }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const peak = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - 18 };
+    ref.current?.animate(
+      [
+        { left: `${from.x}%`, top: `${from.y}%`, transform: 'translate(-50%,-50%) rotate(0deg) scale(.8)' },
+        { left: `${peak.x}%`, top: `${peak.y}%`, transform: 'translate(-50%,-50%) rotate(300deg) scale(1.3)', offset: 0.5 },
+        { left: `${to.x}%`, top: `${to.y}%`, transform: 'translate(-50%,-50%) rotate(620deg) scale(.9)' },
+      ],
+      { duration: 950, easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'forwards' },
+    );
+  }, [from, to]);
+  return (
+    <span
+      ref={ref}
+      className="pointer-events-none absolute z-30 aspect-square w-[4.5%] rounded-full bg-[radial-gradient(circle_at_35%_30%,#ffc06a,#f08a1e_60%,#b85a08)] shadow-[0_8px_12px_#0007] sm:w-[3%]"
+      style={{ left: `${from.x}%`, top: `${from.y}%`, transform: 'translate(-50%,-50%)' }}
+      aria-hidden
+    />
+  );
 }
 
 /**
- * The lobby is a New Year table set for everyone. Guests in the lobby right now sit at their
- * place, lit by the candles; when someone leaves, their chair is pushed back and they dim.
+ * The lobby: Granny's table. Guests sit on stools around a lace tablecloth; the crystal bowls,
+ * the champagne, the candles and the tangerines all react to taps, and everyone sees it.
  */
 export function Table({
   people,
   meId,
   center,
   said = {},
+  table,
+  fx = [],
+  onAct,
+  tipAim = false,
+  onTipDone,
 }: {
   people: Person[];
   meId: number;
   center?: ReactNode;
-  /** latest line of table talk per guest, shown above their chair for a moment */
   said?: Record<number, { text: string; key: number }>;
+  table?: TableState | null;
+  fx?: { id: number; fx: Fx }[];
+  onAct?: (a: TableAction) => void;
+  /** the next tap on a guest tips them */
+  tipAim?: boolean;
+  onTipDone?: () => void;
 }) {
+  const portrait = usePortrait();
+  const [aiming, setAiming] = useState(false);
+  const bottle = useRef<HTMLButtonElement>(null);
+  const seatEls = useRef(new Map<number, HTMLElement>());
   const n = Math.max(people.length, 1);
+  const seatOf = (id: number) => {
+    const i = people.findIndex((p) => p.id === id);
+    return around(Math.max(0, i), n, 45, 44);
+  };
+  const interactive = Boolean(onAct) && !center;
+
+  // Bursts need screen coordinates: champagne pops at the bottle, crackers at the guest.
+  const played = useRef(new Set<number>());
+  useEffect(() => {
+    for (const { id, fx: f } of fx) {
+      if (played.current.has(id)) continue;
+      played.current.add(id);
+      const el = f.type === 'pop' ? bottle.current : f.type === 'cracker' ? seatEls.current.get(f.user) : null;
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      void burst({ x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight });
+    }
+  }, [fx]);
+
+  const dishes: [Dish, number, number, number][] = portrait
+    ? [
+        ['olivier', 50, 29, 27],
+        ['shuba', 50, 71, 27],
+        ['tang', 27, 50, 19],
+        ['caviar', 73, 50, 19],
+      ]
+    : [
+        ['olivier', 35, 35, 15],
+        ['shuba', 65, 35, 15],
+        ['tang', 35, 65, 13],
+        ['caviar', 65, 65, 13],
+      ];
+  const candles: [number, number][] = portrait
+    ? [
+        [33, 36],
+        [67, 64],
+      ]
+    : [
+        [42, 50],
+        [58, 50],
+      ];
+  const recent = (pred: (f: Fx) => boolean) => fx.filter((e) => pred(e.fx));
+
   return (
-    // Chairs sit on the rim and stick out past the box: the margins keep them off the text around it.
-    <div className="relative mx-auto my-[14%] aspect-[3/4] w-full max-w-[560px] sm:my-[7%] sm:aspect-[16/10] sm:max-w-[900px]">
-      {/* linen tablecloth with a pool of candlelight and a soft drape at the edge */}
+    // Stools sit on the rim and stick out past the box: the margins keep them off the text around it.
+    <div className="relative mx-auto mb-[12%] mt-[20%] aspect-[3/4.2] w-full max-w-[560px] select-none sm:mb-[6%] sm:mt-[10%] sm:aspect-[16/10] sm:max-w-[900px]">
+      {/* lace tablecloth */}
       <div
-        className="absolute inset-x-[11%] inset-y-[13%] rounded-[50%]"
-        style={{
-          background:
-            'radial-gradient(60% 55% at 50% 50%, #fffaf0 0%, #f1e8d6 55%, #d8ccb4 100%), repeating-linear-gradient(0deg, #0000000a 0 1px, transparent 1px 3px)',
-          backgroundBlendMode: 'multiply',
-          boxShadow: '0 0 0 1px #00000040, inset 0 -14px 30px #00000026, inset 0 10px 24px #ffffff80, 0 50px 90px -30px #000000d0',
-        }}
-      />
-      {/* place settings */}
+        className="lace absolute inset-x-[10%] inset-y-[11%] rounded-[50%] shadow-[0_50px_90px_-30px_#000c]"
+        style={{ background: 'radial-gradient(60% 55% at 50% 45%, #fffdf8, #f2ebdd 70%, #e2d6c0)' }}
+      >
+        <span className="absolute inset-[6%] rounded-[50%] border-2 border-dashed border-[#d6c6a6]" aria-hidden />
+      </div>
+
+      {/* place settings: a blue-rimmed plate (with whatever you took) and a glass */}
       {people.map((p, i) => {
-        const pos = around(i, n, 29, 27);
+        const pos = around(i, n, portrait ? 27 : 29, portrait ? 30 : 27);
+        const dish = table?.plates[p.id];
+        const full = table?.glasses.includes(p.id);
+        const mine = p.id === meId;
         return (
-          <div key={`set-${p.id}`} className="absolute aspect-square w-[15%] -translate-x-1/2 -translate-y-1/2 sm:w-[10%]" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
-            <Setting angle={pos.deg - 90} />
+          <div key={`set-${p.id}`} className="absolute aspect-square w-[15%] -translate-x-1/2 -translate-y-1/2 sm:w-[8.5%]" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
+            <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle,#fff_55%,#e8e0cf_56%,#fff_64%,#e9dfca)] shadow-[0_0_0_2px_#3b6fb6,0_8px_14px_-6px_#3a1e1288]" />
+            <span className="absolute inset-[30%] rounded-full border-2 border-[#3b6fb6aa]" />
+            {dish && <img key={`${dish}-${p.id}`} src={FOOD[dish].src} alt="" className="hop absolute inset-[18%] size-[64%] rounded-full object-cover" />}
+            <button
+              type="button"
+              disabled={!mine || !interactive || table?.champagne !== 'open'}
+              onClick={() => onAct?.({ kind: 'clink' })}
+              className={cn(
+                'absolute -right-[28%] -top-[28%] grid aspect-square w-[46%] place-items-center rounded-full border-2 border-white/80 shadow-[0_4px_10px_#0006] transition-transform enabled:cursor-pointer enabled:hover:scale-110',
+                full ? 'bg-[radial-gradient(circle_at_40%_35%,#fff6c9,#f2c94c_60%,#c99a3c)]' : 'bg-white/40',
+              )}
+              aria-label={mine ? 'Чокнуться' : `Бокал: ${p.name}`}
+              title={mine && table?.champagne === 'open' ? 'Чин-чин!' : undefined}
+            >
+              {recent((f) => f.type === 'clink' && f.user === p.id).map((e) => (
+                <span key={e.id} className="clink-ring absolute inset-[-40%] rounded-full border-2 border-gold" aria-hidden />
+              ))}
+            </button>
           </div>
         );
       })}
-      {/* the feast, or the wheel at draw time */}
-      <div className={cn('absolute grid place-items-center', center ? 'inset-[17%]' : 'inset-x-[20%] inset-y-[27%] sm:inset-x-[21%] sm:inset-y-[25%]')}>
-        {center ? <div className="aspect-square h-full max-h-full max-w-full">{center}</div> : <Feast />}
-      </div>
 
+      {/* the feast, or the wheel at draw time */}
+      {center ? (
+        <div className="absolute inset-[17%] grid place-items-center">
+          <div className="aspect-square h-full max-h-full max-w-full">{center}</div>
+        </div>
+      ) : (
+        <>
+          {dishes.map(([d, x, y, w]) => {
+            const left = table?.portions[d];
+            const isTang = d === 'tang';
+            return (
+              <div key={d} className="absolute z-10 -translate-x-1/2 -translate-y-1/2" style={{ left: `${x}%`, top: `${y}%`, width: `${w}%` }}>
+                <button
+                  type="button"
+                  disabled={!interactive}
+                  onClick={() => (isTang ? setAiming((a) => !a) : onAct?.({ kind: 'eat', dish: d }))}
+                  className={cn(
+                    'crystal block aspect-square w-full rounded-full p-[6%] shadow-[0_14px_22px_-8px_#3a1e1288] transition-transform duration-200 enabled:cursor-pointer enabled:hover:-translate-y-1 enabled:active:scale-95',
+                    isTang && aiming && 'ring-4 ring-gold',
+                  )}
+                  aria-label={isTang ? 'Взять мандарин, чтобы кинуть в друга' : `Положить себе: ${FOOD[d].label}`}
+                >
+                  <img src={FOOD[d].src} alt="" className="size-full rounded-full object-cover shadow-[inset_0_0_0_2px_#fff]" draggable={false} />
+                </button>
+                <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap border border-[#d9b98a] bg-cream px-2 font-serif text-[12px] italic text-cloth sm:text-[13px]">
+                  {FOOD[d].label}
+                  {left !== undefined && <span className="ml-1 not-italic text-[#a08560] tnum">· {left}</span>}
+                </span>
+                {recent((f) => f.type === 'eat' && f.dish === d && f.refilled).map((e) => (
+                  <span key={e.id} className="float-up absolute left-1/2 top-0 z-20 whitespace-nowrap rounded-full bg-cream px-2.5 py-1 font-hand text-lg text-cloth shadow">
+                    бабушка доложила!
+                  </span>
+                ))}
+              </div>
+            );
+          })}
+
+          {/* «Советское» in the middle: tap to pop, then everyone's glass is full */}
+          <button
+            ref={bottle}
+            type="button"
+            disabled={!interactive}
+            onClick={() => onAct?.({ kind: 'pop' })}
+            className="absolute left-1/2 top-1/2 z-10 grid aspect-square w-[11%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[radial-gradient(circle_at_40%_35%,#3c6b47,#123a22)] shadow-[0_0_0_5px_#183f28,0_10px_18px_-4px_#000] enabled:cursor-pointer enabled:hover:scale-105 sm:w-[6%]"
+            aria-label={table?.champagne === 'open' ? 'Шампанское открыто: чокнуться' : 'Открыть шампанское'}
+          >
+            <span
+              className={cn(
+                'block aspect-square w-[46%] rounded-full',
+                table?.champagne === 'open' ? 'bg-[radial-gradient(#fffbe8,#f6e7a6)] shadow-[0_0_0_3px_#fff8,0_0_12px_#fff]' : 'bg-[radial-gradient(#f5d77a,#b48a2c)]',
+              )}
+            />
+          </button>
+          <span className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap border border-[#d9b98a] bg-cream px-2 font-serif text-[12px] italic text-cloth" style={{ top: portrait ? '55.5%' : '57%' }}>
+            «Советское»{table?.champagne === 'open' ? ' · открыто' : ''}
+          </span>
+
+          {candles.map(([x, y], i) => {
+            const lit = table?.candles[i] ?? true;
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={!interactive}
+                onClick={() => onAct?.({ kind: 'candle', index: i as 0 | 1 })}
+                className="absolute z-10 grid aspect-square w-[6%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[#fbf4e4] shadow-[0_0_0_3px_#c99a3c] enabled:cursor-pointer sm:w-[3%]"
+                style={{ left: `${x}%`, top: `${y}%` }}
+                aria-label={lit ? 'Задуть свечу' : 'Зажечь свечу'}
+              >
+                {lit && <span className="flicker block aspect-square w-[55%] rounded-full bg-[#ffb44a] shadow-[0_0_14px_8px_#ffcf86aa]" />}
+              </button>
+            );
+          })}
+        </>
+      )}
+
+      {/* stools and guests */}
       <ul aria-label="За столом">
         {people.map((p, i) => {
           const pos = around(i, n, 45, 44);
           const here = p.activated && p.online;
           const me = p.id === meId;
           const line = said[p.id];
+          const tangs = table?.tangerines[p.id] ?? 0;
+          const target = (aiming || tipAim) && !me && p.activated;
           return (
             <li
               key={p.id}
-              className="absolute w-[21%] -translate-x-1/2 -translate-y-1/2 sm:w-[12%]"
-              style={{ left: `${pos.x}%`, top: `${pos.y}%`, zIndex: line ? 20 : 1 }}
+              ref={(el) => {
+                if (el) seatEls.current.set(p.id, el);
+              }}
+              className="absolute w-[21%] -translate-x-1/2 -translate-y-1/2 text-center sm:w-[11%]"
+              style={{ left: `${pos.x}%`, top: `${pos.y}%`, zIndex: line ? 20 : 5 }}
             >
               {line && (
                 <span
                   key={line.key}
-                  className="say absolute bottom-full left-1/2 z-10 mb-2 w-max max-w-[11rem] rounded-2xl rounded-bl-sm bg-snow px-3 py-1.5 text-left text-[13px] leading-snug text-night shadow-[0_10px_24px_-8px_#000]"
+                  className="say absolute bottom-full left-1/2 z-10 mb-2 w-max max-w-[11rem] rounded-2xl rounded-bl-sm bg-cream px-3 py-1.5 text-left text-[13px] leading-snug text-ink shadow-[0_10px_24px_-8px_#000]"
                 >
                   {line.text.length > 90 ? `${line.text.slice(0, 88)}…` : line.text}
                 </span>
               )}
-              {/* velvet chair; pushed back from the table when its guest is away */}
-              <div className="relative aspect-square w-full" style={{ transform: `rotate(${pos.deg - 90}deg)` }}>
-               <div className="chair absolute inset-0" data-here={here} style={{ ['--push' as string]: '14%' }}>
-                <span className="absolute inset-x-[4%] bottom-[-8%] top-[62%] rounded-b-[45%] rounded-t-md bg-[linear-gradient(180deg,#4a2c1a,#2a170c)] shadow-[0_6px_10px_-4px_#000]" aria-hidden />
-                <span
-                  className="absolute inset-[8%] rounded-[34%] bg-[radial-gradient(70%_70%_at_40%_35%,#2f6a52,#173a2c_70%,#0f281e)] shadow-[inset_0_0_0_2px_#c59b4b55,0_8px_16px_-6px_#000]"
-                  aria-hidden
-                />
-                <div className="absolute inset-[18%]" style={{ transform: `rotate(${-(pos.deg - 90)}deg)` }}>
-                  {p.activated ? (
-                    <div className="guest size-full" data-here={here}>
-                      <Avatar
-                        id={p.id}
-                        name={p.name}
-                        avatar={p.avatar}
-                        className={cn('size-full text-sm shadow-[0_6px_14px_-4px_#000]', me ? 'ring-2 ring-gold ring-offset-2 ring-offset-[#173a2c]' : 'ring-1 ring-gold/60')}
-                      />
-                    </div>
-                  ) : (
-                    <span className="grid size-full place-items-center rounded-full border border-dashed border-gold/40 font-display text-lg italic text-gold/70" aria-hidden>
-                      ?
-                    </span>
-                  )}
-                </div>
-               </div>
-              </div>
-              {/* place card */}
-              <span
+              {recent((f) => f.type === 'tip' && f.target === p.id).map((e) => (
+                <span key={e.id} className="float-up pointer-events-none absolute bottom-[70%] left-1/2 z-30 flex flex-col items-center" aria-hidden>
+                  <span className="flex items-center gap-1 rounded-md bg-[linear-gradient(180deg,#fff2a8,#ffcf3d_45%,#e09b12)] px-2.5 py-0.5 font-serif text-[15px] font-bold uppercase tracking-wider text-[#5a3200] shadow-[0_0_0_2px_#7a4a00,0_6px_14px_#000a]">
+                    <Coin className="size-5" /> tipped
+                  </span>
+                </span>
+              ))}
+              {recent((f) => f.type === 'react' && f.user === p.id).map((e) => (
+                <span key={e.id} className="float-up absolute bottom-full left-1/2 z-20 text-3xl" aria-hidden>
+                  {(e.fx as { emoji: string }).emoji}
+                </span>
+              ))}
+              <button
+                type="button"
+                disabled={!target}
+                onClick={() => {
+                  if (tipAim) {
+                    onAct?.({ kind: 'tip', target: p.id });
+                    onTipDone?.();
+                  } else {
+                    onAct?.({ kind: 'throw', target: p.id });
+                    setAiming(false);
+                  }
+                }}
                 className={cn(
-                  'mx-auto mt-1 block w-max max-w-full truncate rounded-[3px] border px-2 py-0.5 text-center font-display text-[15px] italic leading-5 shadow-[0_3px_8px_-3px_#000] sm:text-[17px]',
-                  me ? 'border-gold-deep bg-[linear-gradient(180deg,#f3dfa6,#d8b56b)] text-[#2a1d10]' : 'border-gold/50 bg-[#fbf6ea] text-[#3b2a18]',
+                  'relative block aspect-square w-full rounded-full bg-[radial-gradient(circle_at_40%_35%,#a6693a,#5c3416)] shadow-[0_12px_20px_-6px_#000,inset_0_0_0_4px_#00000022]',
+                  target && 'cursor-crosshair ring-4 ring-gold ring-offset-2 ring-offset-transparent',
+                  recent((f) => f.type === 'eat' && f.user === p.id).length > 0 && 'hop',
                 )}
+                aria-label={target ? (tipAim ? `Типнуть ${p.name}` : `Кинуть мандарин в ${p.name}`) : p.name}
               >
-                {p.name}
-                {me && <span className="sr-only"> (это ты)</span>}
-              </span>
+                {p.activated ? (
+                  <Avatar
+                    id={p.id}
+                    name={p.name}
+                    avatar={p.avatar}
+                    className={cn(
+                      'absolute inset-[13%] size-[74%] border-[3px] border-cream text-lg shadow-[0_6px_12px_-4px_#000] transition-[filter,opacity] duration-500',
+                      !here && 'opacity-60 grayscale',
+                    )}
+                  />
+                ) : (
+                  <span className="absolute inset-[13%] grid place-items-center rounded-full border-2 border-dashed border-cream/50 font-display text-2xl text-cream/70">?</span>
+                )}
+                {tangs > 0 && (
+                  <span className="absolute -right-1 -top-1 rounded-full bg-[#f08a1e] px-1.5 text-[12px] font-semibold leading-5 text-white shadow tnum" title="Сколько мандаринов прилетело">
+                    🍊{tangs}
+                  </span>
+                )}
+              </button>
+              <span className={cn('mt-1 block truncate font-hand text-[21px] leading-6 [text-shadow:0_2px_6px_#000] sm:text-[24px]', me ? 'text-gold' : 'text-cream')}>{p.name}</span>
               <span className="sr-only">{!p.activated ? 'ещё не присоединился' : here ? 'за столом' : 'отошёл'}</span>
             </li>
           );
         })}
       </ul>
+
+      {/* tangerines in flight */}
+      {recent((f) => f.type === 'throw').map((e) => {
+        const f = e.fx as { user: number; target: number };
+        return <Flying key={e.id} from={seatOf(f.user)} to={seatOf(f.target)} />;
+      })}
+
+      {(aiming || tipAim) && (
+        <p className="absolute inset-x-0 -bottom-10 text-center font-hand text-2xl text-gold [text-shadow:0_2px_6px_#000]" role="status">
+          {tipAim ? 'Кого типнуть? Тапни по другу' : 'В кого кидаем? Тапни по другу'}
+        </p>
+      )}
     </div>
   );
 }

@@ -66,6 +66,8 @@ export function openDb(file: string): Db {
   // Columns added after the first release.
   const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('avatar_at')) db.exec('ALTER TABLE users ADD COLUMN avatar_at INTEGER');
+  const mcols = (db.prepare('PRAGMA table_info(messages)').all() as { name: string }[]).map((c) => c.name);
+  if (!mcols.includes('kind')) db.exec("ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'text'");
   return db;
 }
 

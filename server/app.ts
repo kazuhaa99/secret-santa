@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import type { Avatars } from './avatars.ts';
 import { findUser, getSetting, setSetting, type Db, type User } from './db.ts';
 import { resetDraw, runDraw } from './draw.ts';
+import { act, freshTable, TableError, TOASTS, type Action } from './table.ts';
 import { issuePassword, LOGIN_RE, type Outgoing } from './telegram.ts';
 
 const COOKIE = 'ss_session';
@@ -157,7 +158,7 @@ export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppD
 
   /** Your own pair only; the wheel gets everyone else who took part. */
   // ── Table talk ──────────────────────────────────────────────────────────
-  const MESSAGE = `SELECT m.id, m.user_id AS userId, u.name, u.avatar_at AS avatar, m.text, m.created_at AS at
+  const MESSAGE = `SELECT m.id, m.user_id AS userId, u.name, u.avatar_at AS avatar, m.text, m.kind, m.created_at AS at
     FROM messages m JOIN users u ON u.id = m.user_id`;
   const chatLimiter = new RateLimiter(20, 60_000);
 
@@ -173,6 +174,42 @@ export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppD
     const text = String(((await c.req.json().catch(() => ({}))) as { text?: string }).text ?? '').trim();
     if (!text || text.length > 500) throw new HttpError(400, 'Сообщение: от 1 до 500 символов');
     if (!chatLimiter.allow(String(me.id))) return c.json({ error: 'Не так быстро: подожди минутку' }, 429);
+    const { lastInsertRowid } = db.prepare('INSERT INTO messages (user_id, text, created_at) VALUES (?, ?, ?)').run(me.id, text, Date.now());
+    const msg = db.prepare(`${MESSAGE} WHERE m.id = ?`).get(Number(lastInsertRowid));
+    hub.emit('chat', JSON.stringify(msg));
+    return c.json(msg, 201);
+  });
+
+  // ── The shared table: food, champagne, candles, tangerines, reactions ───
+  const table = freshTable();
+  const tableLimiter = new RateLimiter(40, 60_000);
+  app.get('/api/table', (c) => c.json(table));
+  app.post('/api/table', async (c) => {
+    const me = c.get('user');
+    if (!tableLimiter.allow(String(me.id))) return c.json({ error: 'Не так быстро, бабушка не успевает' }, 429);
+    const action = (await c.req.json().catch(() => ({}))) as Action;
+    const guests = (db.prepare('SELECT id FROM users WHERE password_hash IS NOT NULL').all() as { id: number }[]).map((r) => r.id);
+    try {
+      const fx = act(table, me.id, action, guests);
+      hub.emit('table', JSON.stringify({ state: table, fx }));
+      // A tip also shows up in the chat, Dota style: "<who> tipped <whom>".
+      if (fx.type === 'tip') {
+        const whom = findUser(db, fx.target)!.name;
+        const { lastInsertRowid } = db.prepare("INSERT INTO messages (user_id, text, kind, created_at) VALUES (?, ?, 'tip', ?)").run(me.id, whom, Date.now());
+        hub.emit('chat', JSON.stringify(db.prepare(`${MESSAGE} WHERE m.id = ?`).get(Number(lastInsertRowid))));
+      }
+      return c.json({ state: table, fx });
+    } catch (e) {
+      if (e instanceof TableError) throw new HttpError(400, e.message);
+      throw e;
+    }
+  });
+
+  /** A random New Year toast, said in the chat by whoever asked for it. */
+  app.post('/api/toast', (c) => {
+    const me = c.get('user');
+    if (!chatLimiter.allow(String(me.id))) return c.json({ error: 'Не так быстро: подожди минутку' }, 429);
+    const text = `🥂 ${TOASTS[Math.floor(Math.random() * TOASTS.length)]}`;
     const { lastInsertRowid } = db.prepare('INSERT INTO messages (user_id, text, created_at) VALUES (?, ?, ?)').run(me.id, text, Date.now());
     const msg = db.prepare(`${MESSAGE} WHERE m.id = ?`).get(Number(lastInsertRowid));
     hub.emit('chat', JSON.stringify(msg));
