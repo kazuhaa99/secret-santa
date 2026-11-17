@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+@import '@fontsource/yeseva-one/cyrillic-400.css';
+@import '@fontsource/yeseva-one/latin-400.css';
+@import '@fontsource-variable/onest';
+
+/*
+ * «Сигаретка»: a late evening with friends. Warm ash surfaces, paper-white text, one ember accent
+ * for what is alive (people in the lobby, the pointer, the action), filter tan for secondary notes.
+ */
+@theme {
+  --color-ink: #13110f;
+  --color-ash: #1c1916;
+  --color-ash-2: #25211d;
+  --color-line: #36302a;
+  --color-paper: #f1ebe1;
+  --color-smoke: #a99f92;
+  --color-ember: #ff6b2c;
+  --color-ember-soft: #ff6b2c26;
+  --color-filter: #d6a066;
+  --color-danger: #ff8a7a;
+
+  --font-display: 'Yeseva One', Georgia, serif;
+  --font-sans: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+:root {
+  color-scheme: dark;
+  caret-color: var(--color-ember);
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: var(--color-ember);
+  color: var(--color-ink);
+}
+
+::placeholder {
+  color: #7d746a;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ember);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ember breathes: the one ambient motion, on the logo tip and on people who are here now. */
+@keyframes smoulder {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.smoulder {
+  animation: smoulder 2.8s ease-in-out infinite;
+}
+
+/* Smoke drifts up from the mark once, on load. */
+@keyframes drift {
+  from {
+    stroke-dashoffset: 60;
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.drift {
+  stroke-dasharray: 60;
+  animation: drift 1.6s var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smoulder,
+  .drift {
+    animation: none;
+  }
+}

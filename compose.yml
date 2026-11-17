@@ -1,0 +1,35 @@
+# One server: the app and Caddy (automatic HTTPS). Settings come from .env next to this file:
+#   DOMAIN=santa.example.com  BOT_TOKEN=123:abc
+name: santa
+
+services:
+  app:
+    build: .
+    environment:
+      SITE_URL: https://${DOMAIN:?set DOMAIN in .env}
+      BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN in .env}
+      DB_FILE: /app/data/santa.db
+    volumes:
+      - data:/app/data
+    restart: unless-stopped
+    mem_limit: 256m
+
+  caddy:
+    image: caddy:2.8-alpine
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:
