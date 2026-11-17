@@ -7,7 +7,7 @@ export const cn = (...v: ClassValue[]) => twMerge(clsx(v));
 type Tone = 'gold' | 'ghost' | 'danger';
 
 const TONES: Record<Tone, string> = {
-  gold: 'bg-gold text-night font-semibold shadow-[0_6px_20px_-6px_#f7c94b99] hover:bg-[#ffd768]',
+  gold: 'bg-[linear-gradient(180deg,#e6c77f,#c9a456)] text-night font-semibold shadow-[inset_0_1px_0_#fff6,0_8px_20px_-10px_#d8b56b] hover:brightness-105',
   ghost: 'border border-line bg-night-2/60 text-snow hover:border-frost/60 hover:bg-night-3',
   danger: 'border border-line text-danger hover:border-danger/60 hover:bg-danger/10',
 };
@@ -18,7 +18,7 @@ export function Button({ tone = 'gold', className, ...props }: ButtonHTMLAttribu
       type="button"
       {...props}
       className={cn(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[15px] transition-[background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-[15px] tracking-[0.01em] transition-[background-color,border-color,transform,filter] duration-150 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50',
         TONES[tone],
         className,
       )}

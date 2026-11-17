@@ -212,6 +212,24 @@ describe('api', () => {
   });
 });
 
+describe('chat', () => {
+  it('posts, lists in order, validates and lets only organisers delete', async () => {
+    const { db, app } = setup();
+    const { cookie } = await login(app, 'anna', activate(db, addUser(db, 'anna'), 1));
+    const post = (text: string) =>
+      app.request('/api/chat', { method: 'POST', headers: { cookie, origin: 'http://localhost', 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+    expect((await post('  ')).status).toBe(400);
+    expect((await post('x'.repeat(501))).status).toBe(400);
+    const first = (await (await post('С наступающим!')).json()) as { id: number; name: string; text: string };
+    expect(first).toMatchObject({ name: 'ANNA', text: 'С наступающим!' });
+    await post('<b>второе</b>');
+    const list = (await (await app.request('/api/chat', { headers: { cookie } })).json()) as { text: string }[];
+    expect(list.map((m) => m.text)).toEqual(['С наступающим!', '<b>второе</b>']);
+    expect((await app.request(`/api/admin/chat/${first.id}`, { method: 'DELETE', headers: { cookie, origin: 'http://localhost' } })).status).toBe(403);
+    expect((await app.request('/api/chat')).status).toBe(401);
+  });
+});
+
 describe('passwords', () => {
   it('hashes with a salt', () => {
     expect(hashPassword('x')).not.toBe(hashPassword('x'));

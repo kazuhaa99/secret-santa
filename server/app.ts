@@ -15,7 +15,7 @@ const MAX_STREAMS_PER_USER = 3;
 /** Who is in the lobby right now (open event streams), plus listeners to push changes to. */
 export class Hub {
   private counts = new Map<number, number>();
-  private listeners = new Set<(event: string) => void>();
+  private listeners = new Set<(event: string, data?: string) => void>();
   online(): number[] {
     return [...this.counts.keys()];
   }
@@ -32,12 +32,13 @@ export class Hub {
     else this.counts.delete(id);
     this.emit('presence');
   }
-  subscribe(fn: (event: string) => void) {
+  subscribe(fn: (event: string, data?: string) => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
-  emit(event: string) {
-    for (const fn of this.listeners) fn(event);
+  /** data: a ready JSON payload (chat); without it listeners send a fresh lobby snapshot. */
+  emit(event: string, data?: string) {
+    for (const fn of this.listeners) fn(event, data);
   }
 }
 
@@ -130,7 +131,9 @@ export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppD
 
   // One snapshot per change, shared by every open stream.
   let cached: string | null = null;
-  hub.subscribe(() => (cached = null));
+  hub.subscribe((_event, data) => {
+    if (data === undefined) cached = null;
+  });
   const snapshot = () => (cached ??= JSON.stringify(lobby()));
 
   app.get('/api/lobby', (c) => c.json({ me: publicUser(c.get('user')), ...lobby() }));
@@ -141,7 +144,7 @@ export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppD
     if (hub.streams(me.id) >= MAX_STREAMS_PER_USER) return c.json({ error: 'Лобби уже открыто в нескольких вкладках' }, 429);
     return streamSSE(c, async (stream) => {
       const push = (event: string, data: string) => stream.writeSSE({ event, data });
-      const off = hub.subscribe((event) => void push(event, snapshot()));
+      const off = hub.subscribe((event, data) => void push(event, data ?? snapshot()));
       hub.join(me.id);
       const beat = setInterval(() => void stream.writeSSE({ event: 'ping', data: '' }), 25_000);
       await push('presence', JSON.stringify(lobby()));
@@ -153,6 +156,24 @@ export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppD
   });
 
   /** Your own pair only; the wheel gets everyone else who took part. */
+  // ── Table talk ──────────────────────────────────────────────────────────
+  const MESSAGE = `SELECT m.id, m.user_id AS userId, u.name, u.avatar_at AS avatar, m.text, m.created_at AS at
+    FROM messages m JOIN users u ON u.id = m.user_id`;
+  const chatLimiter = new RateLimiter(20, 60_000);
+
+  app.get('/api/chat', (c) => c.json((db.prepare(`${MESSAGE} ORDER BY m.id DESC LIMIT 100`).all() as object[]).reverse()));
+
+  app.post('/api/chat', async (c) => {
+    const me = c.get('user');
+    const text = String(((await c.req.json().catch(() => ({}))) as { text?: string }).text ?? '').trim();
+    if (!text || text.length > 500) throw new HttpError(400, 'Сообщение: от 1 до 500 символов');
+    if (!chatLimiter.allow(String(me.id))) return c.json({ error: 'Не так быстро: подожди минутку' }, 429);
+    const { lastInsertRowid } = db.prepare('INSERT INTO messages (user_id, text, created_at) VALUES (?, ?, ?)').run(me.id, text, Date.now());
+    const msg = db.prepare(`${MESSAGE} WHERE m.id = ?`).get(Number(lastInsertRowid));
+    hub.emit('chat', JSON.stringify(msg));
+    return c.json(msg, 201);
+  });
+
   app.get('/api/assignment', (c) => {
     const me = c.get('user');
     const row = db.prepare('SELECT u.id, u.name, u.avatar_at AS avatar FROM assignments a JOIN users u ON u.id = a.receiver_id WHERE a.giver_id = ?').get(me.id) as
@@ -217,6 +238,13 @@ export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppD
     const msg = issuePassword(db, u, siteUrl);
     if (!msg) throw new HttpError(409, 'Участник ещё не открыл ссылку в Telegram');
     await send(msg);
+    return c.json({ ok: true });
+  });
+
+  admin.delete('/chat/:id', (c) => {
+    const id = Number(c.req.param('id'));
+    db.prepare('DELETE FROM messages WHERE id = ?').run(id);
+    hub.emit('chat-delete', JSON.stringify({ id }));
     return c.json({ ok: true });
   });
 

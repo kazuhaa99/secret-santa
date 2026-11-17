@@ -3,12 +3,12 @@ import { useEffect, useMemo } from 'react';
 
 const R = 150;
 const SLICES = [
-  { fill: '#e2383f', ink: '#fbf7ef' },
-  { fill: '#1d7a4e', ink: '#fbf7ef' },
-  { fill: '#f7c94b', ink: '#3a2306' },
-  { fill: '#fbf7ef', ink: '#7d1220' },
+  { fill: '#173a2c', ink: '#f4ecdc' },
+  { fill: '#f4ecdc', ink: '#3b2a18' },
+  { fill: '#5b1220', ink: '#f4ecdc' },
+  { fill: '#e9d9b0', ink: '#3b2a18' },
 ];
-const AVATAR_BG = ['#e2383f', '#1d7a4e', '#c9962a', '#3b5bdb', '#ff8a1f', '#8e44ad'];
+const AVATAR_BG = ['#7a1a28', '#2d5c47', '#8a6a2c', '#2e3f6e', '#6b3b5e', '#4d5a2a'];
 
 interface Slot {
   id: number;
@@ -53,8 +53,8 @@ export function Wheel({ names, target, spin, onDone }: { names: Slot[]; target: 
   return (
     <div className="relative aspect-square w-full">
       {/* the star that points at the result */}
-      <svg viewBox="-12 -12 24 24" className="absolute left-1/2 top-[-7%] z-10 w-[13%] -translate-x-1/2 drop-shadow-[0_0_10px_#f7c94b]" aria-hidden>
-        <path d="M0-11l3 7 8 .6-6 5 2 8L0 5.5-7 9.6l2-8-6-5 8-.6z" fill="#f7c94b" stroke="#c9962a" strokeWidth="1" />
+      <svg viewBox="-12 -12 24 24" className="absolute left-1/2 top-[-3%] z-10 w-[10%] -translate-x-1/2 drop-shadow-[0_0_8px_#d8b56b99]" aria-hidden>
+        <path d="M0-11l3 7 8 .6-6 5 2 8L0 5.5-7 9.6l2-8-6-5 8-.6z" fill="#e6c77f" stroke="#a6823d" strokeWidth="0.8" />
       </svg>
       <motion.svg viewBox={`${-R - 8} ${-R - 8} ${2 * R + 16} ${2 * R + 16}`} className="size-full drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]" style={{ rotate }} aria-hidden>
         <defs>
@@ -64,16 +64,17 @@ export function Wheel({ names, target, spin, onDone }: { names: Slot[]; target: 
             </clipPath>
           ))}
         </defs>
-        <circle r={R + 7} fill="#c9962a" />
-        <circle r={R + 3} fill="#7d1220" />
+        <circle r={R + 7} fill="#a6823d" />
+        <circle r={R + 5} fill="#d8b56b" />
+        <circle r={R + 2} fill="#0c1b15" />
         {names.map((p, i) => {
           const s = SLICES[(n % 4 === 1 && i === n - 1 ? 1 : i) % 4]!;
           const mid = (i + 0.5) * seg;
           return (
             <g key={p.id}>
-              <path d={arc(i, n)} fill={s.fill} stroke="#7d1220" strokeWidth="1.5" />
+              <path d={arc(i, n)} fill={s.fill} stroke="#d8b56b" strokeWidth="1" />
               <g transform={`rotate(${mid - 90}) translate(${R - face / 2 - 8} 0) rotate(90)`}>
-                <circle r={face / 2 + 2} fill="#fbf7ef" />
+                <circle r={face / 2 + 1.5} fill="#d8b56b" />
                 {p.avatar ? (
                   <image href={`/api/avatars/${p.id}?v=${p.avatar}`} x={-face / 2} y={-face / 2} width={face} height={face} clipPath={`url(#face-${p.id})`} preserveAspectRatio="xMidYMid slice" />
                 ) : (
@@ -84,8 +85,9 @@ export function Wheel({ names, target, spin, onDone }: { names: Slot[]; target: 
                 transform={`rotate(${mid - 90}) translate(${R - face - 16} 0)`}
                 textAnchor="end"
                 dominantBaseline="central"
-                fontSize={n > 10 ? 10 : 13}
-                fontFamily="Unbounded Variable, sans-serif"
+                fontSize={n > 10 ? 14 : 18}
+                fontFamily="Cormorant Garamond, serif"
+                fontStyle="italic"
                 fontWeight={600}
                 fill={s.ink}
               >
@@ -95,8 +97,9 @@ export function Wheel({ names, target, spin, onDone }: { names: Slot[]; target: 
           );
         })}
         {/* hub: a bauble */}
-        <circle r={24} fill="#f7c94b" stroke="#c9962a" strokeWidth="3" />
-        <circle cx={-7} cy={-8} r={6} fill="#fff" opacity="0.5" />
+        <circle r={22} fill="#d8b56b" stroke="#a6823d" strokeWidth="2" />
+        <circle r={13} fill="#0c1b15" />
+        <circle r={4} fill="#d8b56b" />
       </motion.svg>
     </div>
   );

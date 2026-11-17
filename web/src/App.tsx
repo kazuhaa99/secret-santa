@@ -43,11 +43,11 @@ export function App() {
 
   return (
     <Scene>
-    <div className="mx-auto min-h-dvh w-full max-w-4xl px-4 pb-16 pt-10 sm:px-6">
+    <div className="mx-auto min-h-dvh w-full max-w-6xl px-4 pb-28 pt-4 sm:px-6 lg:pb-16">
       <header className="flex items-center gap-3 py-4">
         <a href="/" onClick={go('/')} className="mr-auto flex items-center gap-2.5" aria-label="Сигаретка, в лобби">
           <Mark className="h-8 w-auto" smoke={false} />
-          <span className="hidden font-display text-lg font-bold tracking-[-0.01em] sm:inline">Сигаретка</span>
+          <span className="hidden font-display text-2xl font-medium italic sm:inline">Сигаретка</span>
         </a>
         {me.isAdmin && (
           <nav className="flex">
