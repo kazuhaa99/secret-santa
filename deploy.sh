@@ -45,6 +45,8 @@ fi
 
 log 'Build and start'
 sudo docker compose up -d --build --remove-orphans
+# git pull replaces the Caddyfile (new inode); restart Caddy so the bind mount sees the new one.
+sudo docker compose restart caddy >/dev/null
 sudo docker image prune -f >/dev/null
 log "Done: https://$(sed -n 's/^DOMAIN=//p' .env)"
 echo 'Organiser account: sudo docker compose exec app node server/cli.ts create <login> "<Имя>"'
