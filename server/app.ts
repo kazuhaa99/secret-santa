@@ -2,14 +2,15 @@ import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
 import { createInvite, createSession, deleteSession, hashPassword, RateLimiter, userBySession, verifyPassword } from './auth.ts';
+import { randomBytes } from 'node:crypto';
+import type { Avatars } from './avatars.ts';
 import { findUser, getSetting, setSetting, type Db, type User } from './db.ts';
 import { resetDraw, runDraw } from './draw.ts';
-import { issuePassword, type Outgoing } from './telegram.ts';
+import { issuePassword, LOGIN_RE, type Outgoing } from './telegram.ts';
 
 const COOKIE = 'ss_session';
 const DUMMY_HASH = hashPassword('not-a-real-password');
 const MAX_STREAMS_PER_USER = 3;
-const LOGIN_RE = /^[a-z0-9_.-]{3,32}$/i;
 
 /** Who is in the lobby right now (open event streams), plus listeners to push changes to. */
 export class Hub {
@@ -46,13 +47,14 @@ export interface AppDeps {
   siteUrl: string;
   botUsername: () => string;
   send: (m: Outgoing) => Promise<unknown>;
+  avatars: Avatars;
 }
 
 type Env = { Variables: { user: User } };
 
-const publicUser = (u: User) => ({ id: u.id, name: u.name, login: u.login, isAdmin: Boolean(u.is_admin) });
+const publicUser = (u: User) => ({ id: u.id, name: u.name, login: u.login, isAdmin: Boolean(u.is_admin), avatar: u.avatar_at });
 
-export function createApp({ db, hub, siteUrl, botUsername, send }: AppDeps) {
+export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppDeps) {
   const app = new Hono<Env>();
   const limiter = new RateLimiter(10, 15 * 60_000);
   const ipLimiter = new RateLimiter(40, 15 * 60_000);
@@ -101,11 +103,20 @@ export function createApp({ db, hub, siteUrl, botUsername, send }: AppDeps) {
 
   app.get('/api/me', (c) => c.json(publicUser(c.get('user'))));
 
+  // Avatars are for players only (behind the session check), cached until they change (?v=).
+  app.get('/api/avatars/:id', (c) => {
+    const data = avatars.read(Number(c.req.param('id')));
+    if (!data) return c.notFound();
+    return c.body(new Uint8Array(data), 200, { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=604800, immutable' });
+  });
+
   const lobby = () => {
     const online = new Set(hub.online());
-    const users = db.prepare('SELECT id, name, password_hash IS NOT NULL AS activated FROM users ORDER BY name COLLATE NOCASE').all() as {
+    // Seats follow the order people joined, so nobody jumps chairs between visits.
+    const users = db.prepare('SELECT id, name, avatar_at, password_hash IS NOT NULL AS activated FROM users ORDER BY id').all() as {
       id: number;
       name: string;
+      avatar_at: number | null;
       activated: number;
     }[];
     return {
@@ -113,7 +124,7 @@ export function createApp({ db, hub, siteUrl, botUsername, send }: AppDeps) {
       drawAt: getSetting(db, 'draw_at'),
       drawnAt: getSetting(db, 'drawn_at'),
       drawError: getSetting(db, 'draw_error'),
-      participants: users.map((u) => ({ id: u.id, name: u.name, activated: Boolean(u.activated), online: online.has(u.id) })),
+      participants: users.map((u) => ({ id: u.id, name: u.name, avatar: u.avatar_at, activated: Boolean(u.activated), online: online.has(u.id) })),
     };
   };
 
@@ -144,13 +155,13 @@ export function createApp({ db, hub, siteUrl, botUsername, send }: AppDeps) {
   /** Your own pair only; the wheel gets everyone else who took part. */
   app.get('/api/assignment', (c) => {
     const me = c.get('user');
-    const row = db.prepare('SELECT u.id, u.name FROM assignments a JOIN users u ON u.id = a.receiver_id WHERE a.giver_id = ?').get(me.id) as
-      | { id: number; name: string }
+    const row = db.prepare('SELECT u.id, u.name, u.avatar_at AS avatar FROM assignments a JOIN users u ON u.id = a.receiver_id WHERE a.giver_id = ?').get(me.id) as
+      | { id: number; name: string; avatar: number | null }
       | undefined;
     if (!row) return c.json({ error: 'Жеребьёвки для тебя ещё не было' }, 404);
     const wheel = db
-      .prepare('SELECT u.id, u.name FROM assignments a JOIN users u ON u.id = a.giver_id WHERE a.giver_id != ? ORDER BY a.giver_id')
-      .all(me.id) as { id: number; name: string }[];
+      .prepare('SELECT u.id, u.name, u.avatar_at AS avatar FROM assignments a JOIN users u ON u.id = a.giver_id WHERE a.giver_id != ? ORDER BY a.giver_id')
+      .all(me.id) as { id: number; name: string; avatar: number | null }[];
     return c.json({ receiver: row, wheel });
   });
 
@@ -214,9 +225,22 @@ export function createApp({ db, hub, siteUrl, botUsername, send }: AppDeps) {
     if (u.id === c.get('user').id) throw new HttpError(400, 'Себя удалить нельзя');
     if (getSetting(db, 'drawn_at')) throw new HttpError(409, 'Жеребьёвка уже прошла: сначала сбрось её');
     db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
+    avatars.remove(u.id);
     hub.emit('presence');
     return c.json({ ok: true });
   });
+
+  // One shared link for the friends' chat: whoever opens it signs up through the bot.
+  const joinLink = (rotate: boolean) => {
+    let code = getSetting(db, 'join_code');
+    if (!code || rotate) {
+      code = randomBytes(12).toString('base64url');
+      setSetting(db, 'join_code', code);
+    }
+    return { link: `https://t.me/${botUsername() || 'your_bot'}?start=join_${code}` };
+  };
+  admin.get('/join', (c) => c.json(joinLink(false)));
+  admin.post('/join', (c) => c.json(joinLink(true)));
 
   admin.put('/event', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { title?: string; drawAt?: string | null };

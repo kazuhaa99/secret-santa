@@ -1,6 +1,7 @@
 import { Check, Copy, KeyRound, Link2, Trash2, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, fmtWhen, type AdminUser, type Lobby } from '../api';
+import { Avatar } from '../components/Avatar';
 import { Button, cn, Field, Notice } from '../components/ui';
 
 type Flash = { tone: 'info' | 'error'; text: string } | null;
@@ -12,27 +13,35 @@ function toLocalInput(iso: string | null): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-function InviteBox({ link, name }: { link: string; name: string }) {
+function CopyField({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="rounded-xl border border-ember/40 bg-ember-soft p-4">
-      <p className="text-sm text-paper">
-        Ссылка для <b>{name}</b>. Отправь её в личку: по ней бот выдаст пароль. Одноразовая, работает 7 дней.
+    <div className="flex gap-2">
+      <input readOnly value={value} onFocus={(e) => e.currentTarget.select()} className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-night px-3 font-mono text-sm text-snow" aria-label={label} />
+      <Button
+        tone="ghost"
+        onClick={() => {
+          void navigator.clipboard.writeText(value).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1600);
+          });
+        }}
+      >
+        {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+        {copied ? 'Скопировано' : 'Копировать'}
+      </Button>
+    </div>
+  );
+}
+
+function InviteBox({ link, name }: { link: string; name: string }) {
+  return (
+    <div className="rounded-xl border border-gold/40 bg-gold/10 p-4">
+      <p className="text-sm text-snow">
+        Личная ссылка для <b>{name}</b>. Отправь её в личку: по ней бот выдаст пароль. Одноразовая, работает 7 дней.
       </p>
-      <div className="mt-3 flex gap-2">
-        <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-ink px-3 font-mono text-sm text-paper" aria-label="Ссылка-приглашение" />
-        <Button
-          tone="ghost"
-          onClick={() => {
-            void navigator.clipboard.writeText(link).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1600);
-            });
-          }}
-        >
-          {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-          {copied ? 'Скопировано' : 'Копировать'}
-        </Button>
+      <div className="mt-3">
+        <CopyField value={link} label="Ссылка-приглашение" />
       </div>
     </div>
   );
@@ -47,6 +56,7 @@ export function Admin() {
   const [login, setLogin] = useState('');
   const [invite, setInvite] = useState<{ link: string; name: string } | null>(null);
   const [flash, setFlash] = useState<Flash>(null);
+  const [joinLink, setJoinLink] = useState('');
 
   const load = useCallback(async () => {
     const [u, l] = await Promise.all([api<AdminUser[]>('/api/admin/users'), api<Lobby>('/api/lobby')]);
@@ -56,6 +66,7 @@ export function Admin() {
   }, []);
 
   useEffect(() => {
+    api<{ link: string }>('/api/admin/join').then((r) => setJoinLink(r.link), () => {});
     load().then((l) => {
       setTitle(l.title);
       setDrawAt(toLocalInput(l.drawAt));
@@ -94,11 +105,24 @@ export function Admin() {
 
   return (
     <div className="space-y-14">
-      <h1 className="font-display text-4xl">Организатору</h1>
+      <h1 className="font-display text-3xl font-bold">Организатору</h1>
       {flash && <Notice tone={flash.tone}>{flash.text}</Notice>}
 
+      <section aria-labelledby="join" className="space-y-4 rounded-3xl border border-line bg-night/70 p-5">
+        <h2 id="join" className="font-display text-xl font-semibold">
+          Ссылка для чата
+        </h2>
+        <p className="text-sm text-frost">
+          Кинь её в «Сигаретку». Кто откроет, тот зарегистрируется у бота сам: имя, логин, фото. Если ссылка утекла — смени её, старая перестанет работать.
+        </p>
+        {joinLink && <CopyField value={joinLink} label="Ссылка для чата" />}
+        <Button tone="ghost" onClick={() => confirm('Сменить ссылку? Старая перестанет работать.') && void act(async () => setJoinLink((await api<{ link: string }>('/api/admin/join', { method: 'POST' })).link), 'Ссылка обновлена')}>
+          Сменить ссылку
+        </Button>
+      </section>
+
       <section aria-labelledby="event" className="space-y-5">
-        <h2 id="event" className="font-display text-2xl">
+        <h2 id="event" className="font-display text-xl font-semibold">
           Жеребьёвка
         </h2>
         <form onSubmit={saveEvent} className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-end">
@@ -109,7 +133,7 @@ export function Admin() {
           </Button>
         </form>
         <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
-          <p className="mr-auto text-sm text-smoke">
+          <p className="mr-auto text-sm text-frost">
             {drawn
               ? `Прошла ${fmtWhen(lobby!.drawnAt!)}. Пары видят только сами участники.`
               : lobby?.drawAt
@@ -132,9 +156,10 @@ export function Admin() {
       </section>
 
       <section aria-labelledby="people" className="space-y-5">
-        <h2 id="people" className="font-display text-2xl">
+        <h2 id="people" className="font-display text-xl font-semibold">
           Участники
         </h2>
+        <p className="text-sm text-frost">Обычно все приходят по ссылке для чата. Добавить вручную можно здесь — тогда бот выдаст личную ссылку.</p>
         <form onSubmit={addUser} className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <Field label="Имя, как его видят все" value={name} maxLength={40} required onChange={(e) => setName(e.target.value)} />
           <Field label="Логин для входа" value={login} required autoCapitalize="none" spellCheck={false} pattern="[A-Za-z0-9_.\-]{3,32}" title="3–32 символа: латиница, цифры, точка, дефис, подчёркивание" onChange={(e) => setLogin(e.target.value)} />
@@ -147,13 +172,13 @@ export function Admin() {
         <ul className="divide-y divide-line/60 border-y border-line">
           {users.map((u) => (
             <li key={u.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4">
-              <span className={cn('size-2.5 shrink-0 rounded-full', u.online ? 'bg-ember' : 'bg-line')} aria-hidden />
+              <Avatar id={u.id} name={u.name} avatar={u.avatar} className={cn('size-10 shrink-0 text-xs', u.online && 'ring-2 ring-gold')} />
               <div className="min-w-0 flex-1">
                 <p className="text-[17px]">
                   {u.name}
-                  {u.isAdmin && <span className="text-smoke"> · организатор</span>}
+                  {u.isAdmin && <span className="text-frost"> · организатор</span>}
                 </p>
-                <p className="text-sm text-smoke">
+                <p className="text-sm text-frost">
                   <span className="font-mono">{u.login}</span> ·{' '}
                   {u.activated ? (u.online ? 'в лобби' : 'активирован') : u.invitePending ? 'ждём, когда откроет ссылку' : 'ссылка истекла'}
                 </p>

@@ -3,6 +3,7 @@ export interface Me {
   name: string;
   login: string;
   isAdmin: boolean;
+  avatar: number | null;
 }
 
 export interface Lobby {
@@ -10,7 +11,7 @@ export interface Lobby {
   drawAt: string | null;
   drawnAt: string | null;
   drawError: string | null;
-  participants: { id: number; name: string; activated: boolean; online: boolean }[];
+  participants: { id: number; name: string; avatar: number | null; activated: boolean; online: boolean }[];
 }
 
 export interface AdminUser extends Me {

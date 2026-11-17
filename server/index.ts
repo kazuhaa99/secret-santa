@@ -2,16 +2,19 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { createApp, Hub } from './app.ts';
+import { Avatars } from './avatars.ts';
 import { config } from './config.ts';
 import { getSetting, openDb, setSetting, type User } from './db.ts';
 import { drawIsDue, runDraw } from './draw.ts';
-import { Bot, handleUpdate } from './telegram.ts';
+import { avatarRequest, Bot, handleUpdate } from './telegram.ts';
 
 const db = openDb(config.dbFile);
 if (!getSetting(db, 'title')) setSetting(db, 'title', config.defaultTitle);
 
 const hub = new Hub();
+const avatars = new Avatars(join(dirname(config.dbFile), 'avatars'));
 const bot = config.botToken ? new Bot(config.botToken) : null;
 
 const api = createApp({
@@ -20,6 +23,7 @@ const api = createApp({
   siteUrl: config.siteUrl,
   botUsername: () => bot?.username ?? '',
   send: (m) => (bot ? bot.send(m) : Promise.reject(new Error('BOT_TOKEN is not set'))),
+  avatars,
 });
 
 const app = new Hono();
@@ -57,7 +61,18 @@ if (bot) {
     .init()
     .then(() => {
       console.log(`[bot] @${bot.username} is polling`);
-      return bot.poll((u) => handleUpdate(db, u, config.siteUrl));
+      return bot.poll(async (u) => {
+        const photo = avatarRequest(db, u);
+        if (!photo) return handleUpdate(db, u, config.siteUrl);
+        try {
+          const saved = avatars.save(db, photo.userId, await bot.download(photo.fileId));
+          if (saved) hub.emit('presence');
+          return [{ chatId: photo.chatId, text: saved ? 'Готово, аватарка обновлена. Посмотри на сайте.' : 'Не получилось: пришли обычное фото (не файлом).' }];
+        } catch (e) {
+          console.error('[bot] avatar failed', (e as Error).message);
+          return [{ chatId: photo.chatId, text: 'Фото слишком большое или не загрузилось. Попробуй другое.' }];
+        }
+      });
     })
     .catch((e) => console.error('[bot] failed to start', e.message));
 } else console.warn('[bot] BOT_TOKEN is not set: passwords cannot be delivered');

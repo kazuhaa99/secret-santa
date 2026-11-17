@@ -1,13 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, fmtWhen, plural, type Lobby as LobbyData, type Me } from '../api';
+import { Avatar } from '../components/Avatar';
 import { Countdown } from '../components/Countdown';
+import { burst } from '../components/Festive';
+import { Table } from '../components/Table';
 import { TextScramble } from '../components/text-scramble';
-import { Button, cn, Notice } from '../components/ui';
+import { Button, Notice } from '../components/ui';
 import { Wheel } from '../components/Wheel';
 
+interface Slot {
+  id: number;
+  name: string;
+  avatar: number | null;
+}
 interface Assignment {
-  receiver: { id: number; name: string };
-  wheel: { id: number; name: string }[];
+  receiver: Slot;
+  wheel: Slot[];
 }
 
 /** The spin plays once per draw on this device; after that the result is shown straight away. */
@@ -24,9 +32,10 @@ export function Lobby({ me }: { me: Me }) {
   const [lobby, setLobby] = useState<LobbyData | null>(null);
   const [live, setLive] = useState(false);
 
-  // One stream keeps the list live and tells us the moment the draw happens.
+  // One stream keeps the table live and tells us the moment the draw happens.
   useEffect(() => {
-    api<LobbyData & { me: Me }>('/api/lobby').then(setLobby, () => {});
+    // The first plain fetch must not overwrite a newer snapshot that already came from the stream.
+    api<LobbyData>('/api/lobby').then((l) => setLobby((prev) => prev ?? l), () => {});
     const es = new EventSource('/api/lobby/stream');
     const onData = (e: MessageEvent<string>) => setLobby(JSON.parse(e.data) as LobbyData);
     es.addEventListener('presence', onData);
@@ -36,72 +45,54 @@ export function Lobby({ me }: { me: Me }) {
     return () => es.close();
   }, []);
 
-  if (!lobby) return <p className="px-5 py-16 text-smoke">Заходим в лобби…</p>;
+  if (!lobby) return <p className="px-5 py-16 text-center font-hand text-3xl text-frost">Накрываем на стол…</p>;
 
   const here = lobby.participants.filter((p) => p.online).length;
 
   return (
-    <div className="space-y-12">
-      <section aria-labelledby="draw-title">
-        {lobby.drawnAt ? (
-          <Result drawnAt={lobby.drawnAt} />
-        ) : (
-          <>
-            <h1 id="draw-title" className="font-display text-[clamp(2.25rem,8vw,3.5rem)] leading-[1.05]">
-              {lobby.title}
-            </h1>
+    <div className="space-y-8">
+      <header className="text-center">
+        <h1 className="rise font-display text-[clamp(1.9rem,7vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.02em]">{lobby.title}</h1>
+        <p className="rise mt-2 font-hand text-[26px] leading-tight text-gold" style={{ ['--d' as string]: 1 }} aria-live="polite">
+          За столом {here} из {plural(lobby.participants.length, ['гостя', 'гостей', 'гостей'])}
+          {!live && <span className="font-sans text-sm text-frost"> · переподключаемся</span>}
+        </p>
+      </header>
+
+      {lobby.drawnAt ? (
+        <Draw drawnAt={lobby.drawnAt} people={lobby.participants} meId={me.id} />
+      ) : (
+        <>
+          <section aria-label="Обратный отсчёт" className="rise" style={{ ['--d' as string]: 2 }}>
             {lobby.drawAt ? (
-              <div className="mt-8">
-                <p className="mb-4 text-smoke">Колесо закрутится {fmtWhen(lobby.drawAt)}</p>
+              <>
+                <p className="mb-3 text-center text-frost">Колесо закрутится {fmtWhen(lobby.drawAt)}</p>
                 <Countdown to={lobby.drawAt} />
-              </div>
+              </>
             ) : (
-              <p className="mt-6 max-w-[42ch] text-lg text-smoke">Время жеребьёвки ещё не назначено. Как только организатор его выберет, здесь пойдёт обратный отсчёт.</p>
+              <p className="mx-auto max-w-[40ch] text-center text-frost">Время жеребьёвки ещё не назначено. Как только организатор его выберет, здесь пойдёт обратный отсчёт.</p>
             )}
             {lobby.drawError && (
-              <div className="mt-6">
+              <div className="mx-auto mt-4 max-w-md">
                 <Notice tone="error">Жеребьёвка не состоялась: {lobby.drawError}</Notice>
               </div>
             )}
-          </>
-        )}
-      </section>
+          </section>
+          <Table people={lobby.participants} meId={me.id} />
+        </>
+      )}
 
-      <section aria-labelledby="people">
-        <div className="flex items-baseline justify-between gap-4 border-b border-line pb-3">
-          <h2 id="people" className="font-display text-2xl">
-            В лобби
-          </h2>
-          <p className="text-sm text-smoke tnum" aria-live="polite">
-            {here} из {plural(lobby.participants.length, ['участника', 'участников', 'участников'])}
-            {!live && ' · переподключаемся'}
-          </p>
-        </div>
-        <ul className="divide-y divide-line/60">
-          {lobby.participants.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 py-3">
-              <span
-                className={cn('size-2.5 shrink-0 rounded-full', p.online ? 'smoulder bg-ember shadow-[0_0_10px_2px_var(--color-ember-soft)]' : 'bg-line')}
-                aria-hidden
-              />
-              <span className={cn('flex-1 text-[17px]', !p.online && 'text-smoke')}>
-                {p.name}
-                {p.id === me.id && <span className="text-smoke"> · это ты</span>}
-              </span>
-              <span className="text-sm text-smoke">{!p.activated ? 'ещё не открыл ссылку' : p.online ? 'здесь' : 'не в сети'}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <p className="text-center text-sm text-frost">Новая аватарка — просто пришли фото боту в Telegram.</p>
     </div>
   );
 }
 
-function Result({ drawnAt }: { drawnAt: string }) {
+function Draw({ drawnAt, people, meId }: { drawnAt: string; people: LobbyData['participants']; meId: number }) {
   const [data, setData] = useState<Assignment | null>(null);
   const [missing, setMissing] = useState(false);
   const [phase, setPhase] = useState<'spin' | 'reveal'>(() => (wasSeen(drawnAt) ? 'reveal' : 'spin'));
   const [run, setRun] = useState(0);
+  const card = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api<Assignment>('/api/assignment').then(setData, (e) => setMissing(e instanceof ApiError && e.status === 404));
@@ -114,36 +105,45 @@ function Result({ drawnAt }: { drawnAt: string }) {
       /* private mode: the spin just plays again next time */
     }
     setPhase('reveal');
+    void burst();
+    requestAnimationFrame(() => card.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
   }, [drawnAt]);
 
   if (missing)
     return (
       <>
-        <h1 className="font-display text-4xl">Жеребьёвка прошла без тебя</h1>
-        <p className="mt-4 text-smoke">Ты активировал аккаунт уже после неё. Напиши организатору: он может провести её заново.</p>
+        <Table people={people} meId={meId} />
+        <div className="mx-auto max-w-md text-center">
+          <h2 className="font-display text-2xl font-semibold">Жеребьёвка прошла без тебя</h2>
+          <p className="mt-3 text-frost">Ты присоединился уже после неё. Напиши организатору: он может провести её заново.</p>
+        </div>
       </>
     );
-  if (!data) return <p className="text-smoke">Достаём твою бумажку…</p>;
 
   return (
-    <div className="grid items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Wheel key={run} names={data.wheel} target={data.receiver.id} spin={phase === 'spin'} onDone={done} />
-      <div aria-live="polite">
-        {phase === 'spin' ? (
-          <p className="font-display text-3xl text-smoke">Крутим…</p>
-        ) : (
-          <>
-            <p className="text-smoke">Ты даришь подарок</p>
-            <h1 className="mt-2 font-display text-[clamp(2.5rem,10vw,4rem)] leading-[1.05] text-ember">
+    <>
+      <Table
+        people={people}
+        meId={meId}
+        center={data ? <Wheel key={run} names={data.wheel} target={data.receiver.id} spin={phase === 'spin'} onDone={done} /> : undefined}
+      />
+      {data && phase === 'reveal' && (
+        <div ref={card} className="rise mx-auto flex max-w-md flex-col items-center text-center" aria-live="polite">
+          {/* gift tag with a string */}
+          <div className="relative w-full rounded-[28px] border-2 border-gold bg-snow px-6 pb-7 pt-10 text-night shadow-[0_30px_60px_-20px_#000]">
+            <span className="absolute -top-3 left-1/2 size-6 -translate-x-1/2 rounded-full border-4 border-gold bg-night" aria-hidden />
+            <p className="font-hand text-[26px] leading-none text-cloth">Ты даришь подарок</p>
+            <Avatar id={data.receiver.id} name={data.receiver.name} avatar={data.receiver.avatar} className="mx-auto mt-5 size-28 text-3xl ring-4 ring-gold ring-offset-4 ring-offset-snow" />
+            <h2 className="mt-5 font-display text-[clamp(2rem,9vw,2.75rem)] font-bold leading-[1.05] text-cloth-deep">
               <TextScramble key={run}>{data.receiver.name}</TextScramble>
-            </h1>
-            <p className="mt-5 max-w-[36ch] text-smoke">Это секрет. Не выдавай его даже в Сигаретке.</p>
-            <Button tone="ghost" className="mt-8" onClick={() => (setPhase('spin'), setRun((r) => r + 1))}>
-              Покрутить ещё раз
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
+            </h2>
+            <p className="mt-4 font-hand text-[24px] leading-tight text-pine-deep">Тсс… это секрет. Не пали в Сигаретке.</p>
+          </div>
+          <Button tone="ghost" className="mt-6" onClick={() => (setPhase('spin'), setRun((r) => r + 1))}>
+            Покрутить ещё раз
+          </Button>
+        </div>
+      )}
+    </>
   );
 }

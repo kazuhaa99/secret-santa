@@ -1,6 +1,7 @@
 import { LogOut } from 'lucide-react';
 import { useEffect, useState, type MouseEvent } from 'react';
 import { api, type Me } from './api';
+import { Scene } from './components/Festive';
 import { Mark } from './components/Mark';
 import { cn } from './components/ui';
 import { Admin } from './pages/Admin';
@@ -35,17 +36,18 @@ export function App() {
 
   const adminPage = path === '/admin' && me.isAdmin;
   const link = (to: string, label: string, active: boolean) => (
-    <a href={to} onClick={go(to)} aria-current={active ? 'page' : undefined} className={cn('rounded-md px-2.5 py-1.5 text-sm', active ? 'text-paper' : 'text-smoke hover:text-paper')}>
+    <a href={to} onClick={go(to)} aria-current={active ? 'page' : undefined} className={cn('rounded-md px-2.5 py-1.5 text-sm', active ? 'bg-night-3 text-snow' : 'text-frost hover:text-snow')}>
       {label}
     </a>
   );
 
   return (
-    <div className="mx-auto min-h-dvh w-full max-w-3xl px-5 pb-16">
-      <header className="flex items-center gap-3 py-5">
+    <Scene>
+    <div className="mx-auto min-h-dvh w-full max-w-4xl px-4 pb-16 pt-10 sm:px-6">
+      <header className="flex items-center gap-3 py-4">
         <a href="/" onClick={go('/')} className="mr-auto flex items-center gap-2.5" aria-label="Сигаретка, в лобби">
-          <Mark className="h-7 w-auto" smoke={false} />
-          <span className="font-display text-xl">Сигаретка</span>
+          <Mark className="h-8 w-auto" smoke={false} />
+          <span className="hidden font-display text-lg font-bold tracking-[-0.01em] sm:inline">Сигаретка</span>
         </a>
         {me.isAdmin && (
           <nav className="flex">
@@ -56,14 +58,15 @@ export function App() {
         <button
           type="button"
           onClick={() => void api('/api/logout', { method: 'POST' }).finally(() => setMe(null))}
-          className="grid size-10 place-items-center rounded-md text-smoke hover:text-paper"
+          className="grid size-10 place-items-center rounded-md text-frost hover:text-snow"
           aria-label="Выйти"
           title="Выйти"
         >
           <LogOut className="size-[18px]" aria-hidden />
         </button>
       </header>
-      <main className="pt-6">{adminPage ? <Admin /> : <Lobby me={me} />}</main>
+      <main className="pt-4">{adminPage ? <Admin /> : <Lobby me={me} />}</main>
     </div>
+    </Scene>
   );
 }

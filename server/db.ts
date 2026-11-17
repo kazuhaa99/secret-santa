@@ -15,6 +15,7 @@ export interface User {
   invite_expires: number | null;
   created_at: number;
   activated_at: number | null;
+  avatar_at: number | null;
 }
 
 const SCHEMA = `
@@ -39,6 +40,12 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+CREATE TABLE IF NOT EXISTS signups (
+  chat_id INTEGER PRIMARY KEY,
+  step TEXT NOT NULL,
+  name TEXT,
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS assignments (
   giver_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -50,6 +57,9 @@ export function openDb(file: string): Db {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
+  // Columns added after the first release.
+  const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('avatar_at')) db.exec('ALTER TABLE users ADD COLUMN avatar_at INTEGER');
   return db;
 }
 

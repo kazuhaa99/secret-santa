@@ -1,21 +1,26 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createApp, Hub } from './app.ts';
+import { Avatars } from './avatars.ts';
 import { createInvite, hashPassword, verifyPassword } from './auth.ts';
 import { openDb, type Db, type User } from './db.ts';
 import { drawIsDue, runDraw, singleCycle } from './draw.ts';
-import { handleUpdate } from './telegram.ts';
+import { avatarRequest, handleUpdate } from './telegram.ts';
 
 const SITE = 'https://santa.test';
 
 function setup() {
   const db = openDb(':memory:');
   const sent: { chatId: number; text: string }[] = [];
-  const app = createApp({ db, hub: new Hub(), siteUrl: SITE, botUsername: () => 'santa_bot', send: async (m) => sent.push(m) });
-  return { db, app, sent };
+  const avatars = new Avatars(mkdtempSync(join(tmpdir(), 'santa-')));
+  const app = createApp({ db, hub: new Hub(), siteUrl: SITE, botUsername: () => 'santa_bot', send: async (m) => sent.push(m), avatars });
+  return { db, app, sent, avatars };
 }
 
 const tg = (chatId: number, text: string) => ({ update_id: 1, message: { chat: { id: chatId, type: 'private' }, text } });
-const passwordFrom = (text: string) => /Пароль: (\S+)/.exec(text)![1]!;
+const passwordFrom = (text: string) => /Пароль: <code>(\S+)<\/code>/.exec(text)![1]!;
 
 function addUser(db: Db, login: string, admin = false): number {
   return Number(db.prepare('INSERT INTO users (login, name, is_admin, created_at) VALUES (?, ?, ?, ?)').run(login, login.toUpperCase(), admin ? 1 : 0, Date.now()).lastInsertRowid);
@@ -105,6 +110,54 @@ describe('telegram onboarding', () => {
     const [reply] = handleUpdate(db, tg(666, `/start ${createInvite(db, victim)}`), SITE);
     expect(reply!.text).not.toMatch(/Пароль/);
     expect((db.prepare('SELECT tg_chat_id FROM users WHERE id = ?').get(victim) as { tg_chat_id: number }).tg_chat_id).toBe(2);
+  });
+
+  it('signs up from the shared chat link: name, login, then a password', () => {
+    const { db } = setup();
+    db.prepare("INSERT INTO settings VALUES ('join_code', 'abc')").run();
+    expect(handleUpdate(db, tg(7, '/start join_wrong'), SITE)[0]!.text).toMatch(/устарела/);
+    expect(handleUpdate(db, tg(7, '/start join_abc'), SITE)[0]!.text).toMatch(/имя/);
+    expect(handleUpdate(db, tg(7, 'Лёша <b>'), SITE)[0]!.text).toMatch(/Лёша &lt;b&gt;.*логин/s);
+    addUser(db, 'taken');
+    expect(handleUpdate(db, tg(7, 'taken'), SITE)[0]!.text).toMatch(/занят/);
+    expect(handleUpdate(db, tg(7, 'no spaces'), SITE)[0]!.text).toMatch(/латиница/);
+    const password = passwordFrom(handleUpdate(db, tg(7, 'lesha'), SITE)[0]!.text);
+    const user = db.prepare("SELECT * FROM users WHERE login = 'lesha'").get() as unknown as User;
+    expect(user.name).toBe('Лёша <b>');
+    expect(user.tg_chat_id).toBe(7);
+    expect(verifyPassword(password, user.password_hash)).toBe(true);
+    expect(handleUpdate(db, tg(7, '/start join_abc'), SITE)[0]!.text).toMatch(/уже в игре/);
+  });
+
+  it('closes sign-up after the draw', () => {
+    const { db } = setup();
+    db.prepare("INSERT INTO settings VALUES ('join_code', 'abc'), ('drawn_at', '2026-12-25')").run();
+    expect(handleUpdate(db, tg(8, '/start join_abc'), SITE)[0]!.text).toMatch(/закрыта/);
+  });
+
+  it('takes avatars from known chats only, and only JPEG', async () => {
+    const { db, app, avatars } = setup();
+    const id = addUser(db, 'anna');
+    const password = activate(db, id, 5);
+    const photo = {
+      update_id: 2,
+      message: {
+        chat: { id: 5, type: 'private' },
+        photo: [
+          { file_id: 'big', width: 1280, height: 1280 },
+          { file_id: 'mid', width: 320, height: 320 },
+          { file_id: 'tiny', width: 90, height: 90 },
+        ],
+      },
+    };
+    expect(avatarRequest(db, photo)).toEqual({ userId: id, chatId: 5, fileId: 'mid' });
+    expect(avatarRequest(db, { ...photo, message: { ...photo.message, chat: { id: 99, type: 'private' } } })).toBeNull();
+    expect(avatars.save(db, id, Buffer.from('<svg>'))).toBe(false);
+    expect(avatars.save(db, id, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2]))).toBe(true);
+    const { cookie } = await login(app, 'anna', password);
+    const res = await app.request(`/api/avatars/${id}`, { headers: { cookie } });
+    expect(res.headers.get('content-type')).toBe('image/jpeg');
+    expect((await app.request(`/api/avatars/${id}`)).status).toBe(401);
   });
 
   it('ignores group chats', () => {

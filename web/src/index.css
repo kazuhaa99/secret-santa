@@ -1,39 +1,48 @@
 @import 'tailwindcss';
-@import '@fontsource/yeseva-one/cyrillic-400.css';
-@import '@fontsource/yeseva-one/latin-400.css';
+@import '@fontsource-variable/unbounded';
+@import '@fontsource-variable/caveat';
 @import '@fontsource-variable/onest';
 
 /*
- * «Сигаретка»: a late evening with friends. Warm ash surfaces, paper-white text, one ember accent
- * for what is alive (people in the lobby, the pointer, the action), filter tan for secondary notes.
+ * New Year's Eve at the Сигаретка table: a winter night sky with an aurora, snow, a garland,
+ * a crimson tablecloth with gold trim, pine greens, tangerine orange. Unbounded for big festive
+ * words, Caveat for handwritten place cards, Onest for everything you read.
  */
 @theme {
-  --color-ink: #13110f;
-  --color-ash: #1c1916;
-  --color-ash-2: #25211d;
-  --color-line: #36302a;
-  --color-paper: #f1ebe1;
-  --color-smoke: #a99f92;
-  --color-ember: #ff6b2c;
-  --color-ember-soft: #ff6b2c26;
-  --color-filter: #d6a066;
-  --color-danger: #ff8a7a;
+  --color-night: #0b1030;
+  --color-night-2: #131a46;
+  --color-night-3: #1c2560;
+  --color-line: #2c3675;
+  --color-snow: #fbf7ef;
+  --color-frost: #b8c3f0;
+  --color-gold: #f7c94b;
+  --color-gold-deep: #c9962a;
+  --color-berry: #e2383f;
+  --color-cloth: #a91f2c;
+  --color-cloth-deep: #7d1220;
+  --color-pine: #1d7a4e;
+  --color-pine-deep: #0f4f33;
+  --color-tangerine: #ff8a1f;
+  --color-wood: #7a4a2b;
+  --color-danger: #ff9a8f;
 
-  --font-display: 'Yeseva One', Georgia, serif;
+  --font-display: 'Unbounded Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-hand: 'Caveat Variable', cursive;
   --font-sans: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 :root {
   color-scheme: dark;
-  caret-color: var(--color-ember);
+  caret-color: var(--color-gold);
 }
 
 html,
 body {
-  background: var(--color-ink);
-  color: var(--color-paper);
+  background: var(--color-night);
+  color: var(--color-snow);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
@@ -48,39 +57,92 @@ p {
 }
 
 ::selection {
-  background: var(--color-ember);
-  color: var(--color-ink);
+  background: var(--color-gold);
+  color: var(--color-night);
 }
-
 ::placeholder {
-  color: #7d746a;
+  color: #7f8bc4;
 }
-
 :focus-visible {
-  outline: 2px solid var(--color-ember);
+  outline: 2px solid var(--color-gold);
   outline-offset: 3px;
-  border-radius: 6px;
+  border-radius: 8px;
+}
+* {
+  scrollbar-color: var(--color-line) transparent;
 }
 
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
-/* The ember breathes: the one ambient motion, on the logo tip and on people who are here now. */
-@keyframes smoulder {
+/* ── Sky: a slow aurora behind everything ─────────────────────────────── */
+.sky {
+  background:
+    radial-gradient(120% 70% at 50% 0%, #1b2a78 0%, transparent 60%),
+    linear-gradient(180deg, #0b1030 0%, #0d1236 55%, #0a0d26 100%);
+}
+.aurora {
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 70vh;
+  filter: blur(60px);
+  opacity: 0.55;
+  background:
+    radial-gradient(40% 50% at 25% 40%, #1fd39a66, transparent 70%),
+    radial-gradient(35% 45% at 70% 30%, #7c5cff55, transparent 70%),
+    radial-gradient(30% 40% at 50% 60%, #23b8e255, transparent 70%);
+  animation: aurora 26s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  to {
+    transform: translate3d(6%, 4%, 0) scale(1.15) rotate(4deg);
+    opacity: 0.8;
+  }
+}
+
+/* ── Garland: bulbs glow in turns ─────────────────────────────────────── */
+.bulb {
+  animation: bulb 2.4s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.37s);
+}
+@keyframes bulb {
   0%,
   100% {
     opacity: 1;
+    filter: drop-shadow(0 0 6px currentColor);
   }
   50% {
-    opacity: 0.55;
+    opacity: 0.35;
+    filter: none;
   }
 }
-.smoulder {
-  animation: smoulder 2.8s ease-in-out infinite;
+
+/* ── Candles on the table ─────────────────────────────────────────────── */
+.flame {
+  transform-origin: 50% 100%;
+  animation: flame 1.6s ease-in-out infinite alternate;
+}
+@keyframes flame {
+  to {
+    transform: scale(0.85, 1.12) rotate(3deg);
+  }
 }
 
-/* Smoke drifts up from the mark once, on load. */
+/* ── People at the table ──────────────────────────────────────────────── */
+.seat-here {
+  box-shadow:
+    0 0 0 3px var(--color-gold),
+    0 0 22px 4px #f7c94b88;
+  animation: seat-in 600ms var(--ease-spring) both;
+}
+@keyframes seat-in {
+  from {
+    transform: scale(0.6);
+  }
+}
+
+/* Smoke from the mark drifts up once. */
 @keyframes drift {
   from {
     stroke-dashoffset: 60;
@@ -93,9 +155,25 @@ p {
   animation: drift 1.6s var(--ease-out) both;
 }
 
+@keyframes rise {
+  from {
+    transform: translateY(16px);
+    filter: blur(6px);
+  }
+}
+/* Starts visible (blur + offset only): nothing stays hidden if an animation stalls. */
+.rise {
+  animation: rise 700ms var(--ease-out) both;
+  animation-delay: calc(var(--d, 0) * 90ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .smoulder,
-  .drift {
+  .aurora,
+  .bulb,
+  .flame,
+  .seat-here,
+  .drift,
+  .rise {
     animation: none;
   }
 }
