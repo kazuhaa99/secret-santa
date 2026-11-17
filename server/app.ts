@@ -10,7 +10,7 @@ import { issuePassword, LOGIN_RE, type Outgoing } from './telegram.ts';
 
 const COOKIE = 'ss_session';
 const DUMMY_HASH = hashPassword('not-a-real-password');
-const MAX_STREAMS_PER_USER = 3;
+const MAX_STREAMS_PER_USER = 6;
 
 /** Who is in the lobby right now (open event streams), plus listeners to push changes to. */
 export class Hub {
@@ -161,7 +161,12 @@ export function createApp({ db, hub, siteUrl, botUsername, send, avatars }: AppD
     FROM messages m JOIN users u ON u.id = m.user_id`;
   const chatLimiter = new RateLimiter(20, 60_000);
 
-  app.get('/api/chat', (c) => c.json((db.prepare(`${MESSAGE} ORDER BY m.id DESC LIMIT 100`).all() as object[]).reverse()));
+  // ?after=<id> returns only newer messages: the client uses it to catch up after a dropped stream.
+  app.get('/api/chat', (c) => {
+    const after = Number(c.req.query('after') ?? 0) || 0;
+    if (after > 0) return c.json(db.prepare(`${MESSAGE} WHERE m.id > ? ORDER BY m.id LIMIT 200`).all(after));
+    return c.json((db.prepare(`${MESSAGE} ORDER BY m.id DESC LIMIT 100`).all() as object[]).reverse());
+  });
 
   app.post('/api/chat', async (c) => {
     const me = c.get('user');

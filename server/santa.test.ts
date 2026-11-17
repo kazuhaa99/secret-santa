@@ -225,6 +225,8 @@ describe('chat', () => {
     await post('<b>второе</b>');
     const list = (await (await app.request('/api/chat', { headers: { cookie } })).json()) as { text: string }[];
     expect(list.map((m) => m.text)).toEqual(['С наступающим!', '<b>второе</b>']);
+    const newer = (await (await app.request(`/api/chat?after=${first.id}`, { headers: { cookie } })).json()) as { text: string }[];
+    expect(newer.map((m) => m.text)).toEqual(['<b>второе</b>']);
     expect((await app.request(`/api/admin/chat/${first.id}`, { method: 'DELETE', headers: { cookie, origin: 'http://localhost' } })).status).toBe(403);
     expect((await app.request('/api/chat')).status).toBe(401);
   });

@@ -232,7 +232,8 @@ export function Table({
 }) {
   const n = Math.max(people.length, 1);
   return (
-    <div className="relative mx-auto aspect-[3/4] w-full max-w-[560px] sm:aspect-[16/10] sm:max-w-[900px]">
+    // Chairs sit on the rim and stick out past the box: the margins keep them off the text around it.
+    <div className="relative mx-auto my-[14%] aspect-[3/4] w-full max-w-[560px] sm:my-[7%] sm:aspect-[16/10] sm:max-w-[900px]">
       {/* linen tablecloth with a pool of candlelight and a soft drape at the edge */}
       <div
         className="absolute inset-x-[11%] inset-y-[13%] rounded-[50%]"

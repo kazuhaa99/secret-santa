@@ -35,47 +35,106 @@ export function Lobby({ me }: { me: Me }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatReady, setChatReady] = useState(false);
   const [said, setSaid] = useState<Record<number, { text: string; key: number }>>({});
-  const [chatError, setChatError] = useState('');
+  const lastId = useRef(0);
 
-  // One stream: who is at the table, table talk, and the moment of the draw.
-  useEffect(() => {
-    // The first plain fetch must not overwrite a newer snapshot that already came from the stream.
-    api<LobbyData>('/api/lobby').then((l) => setLobby((prev) => prev ?? l), () => {});
-    api<Message[]>('/api/chat').then(
-      (list) => {
-        setMessages((prev) => [...list, ...prev.filter((m) => !list.some((x) => x.id === m.id))]);
-        setChatReady(true);
-      },
-      () => setChatReady(true),
-    );
-    const es = new EventSource('/api/lobby/stream');
-    const onLobby = (e: MessageEvent<string>) => setLobby(JSON.parse(e.data) as LobbyData);
-    es.addEventListener('presence', onLobby);
-    es.addEventListener('draw', onLobby);
-    es.addEventListener('chat', (e: MessageEvent<string>) => {
-      const m = JSON.parse(e.data) as Message;
-      setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-      setSaid((prev) => ({ ...prev, [m.userId]: { text: m.text, key: m.id } }));
+  /** Adds messages from the server, by id, keeping the ones still being sent at the end. */
+  const merge = useCallback((list: Message[]) => {
+    if (!list.length) return;
+    setMessages((prev) => {
+      const byId = new Map(prev.filter((m) => m.id > 0).map((m) => [m.id, m]));
+      for (const m of list) byId.set(m.id, m);
+      const sent = [...byId.values()].sort((a, b) => a.id - b.id);
+      lastId.current = Math.max(lastId.current, sent.at(-1)?.id ?? 0);
+      return [...sent, ...prev.filter((m) => m.id < 0)];
     });
-    es.addEventListener('chat-delete', (e: MessageEvent<string>) => {
-      const { id } = JSON.parse(e.data) as { id: number };
-      setMessages((prev) => prev.filter((m) => m.id !== id));
-    });
-    es.onopen = () => setLive(true);
-    es.onerror = () => setLive(false);
-    return () => es.close();
   }, []);
 
-  const send = useCallback(async (text: string) => {
+  /** Fetches whatever the live stream may have missed. */
+  const catchUp = useCallback(async () => {
     try {
-      await api('/api/chat', { method: 'POST', body: { text } });
-      setChatError('');
-      return true;
-    } catch (e) {
-      setChatError(e instanceof ApiError ? e.message : 'Нет связи с сервером');
-      return false;
+      merge(await api<Message[]>(lastId.current ? `/api/chat?after=${lastId.current}` : '/api/chat'));
+    } catch {
+      /* next tick tries again */
+    } finally {
+      setChatReady(true);
     }
-  }, []);
+  }, [merge]);
+
+  /*
+   * One live stream (who is at the table, table talk, the draw), plus a safety net: catch up on
+   * every (re)connect, poll every 10 s, and reconnect if the stream has been silent for 40 s
+   * (the server pings every 25 s), e.g. after a phone slept or the site was redeployed.
+   */
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let heard = Date.now();
+    const onLobby = (e: MessageEvent<string>) => {
+      heard = Date.now();
+      setLobby(JSON.parse(e.data) as LobbyData);
+    };
+    const connect = () => {
+      es?.close();
+      es = new EventSource('/api/lobby/stream');
+      heard = Date.now();
+      es.addEventListener('presence', onLobby);
+      es.addEventListener('draw', onLobby);
+      es.addEventListener('ping', () => (heard = Date.now()));
+      es.addEventListener('chat', (e: MessageEvent<string>) => {
+        heard = Date.now();
+        const m = JSON.parse(e.data) as Message;
+        merge([m]);
+        setSaid((prev) => ({ ...prev, [m.userId]: { text: m.text, key: m.id } }));
+      });
+      es.addEventListener('chat-delete', (e: MessageEvent<string>) => {
+        const { id } = JSON.parse(e.data) as { id: number };
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+      });
+      es.onopen = () => {
+        setLive(true);
+        void catchUp();
+        api<LobbyData>('/api/lobby').then(setLobby, () => {});
+      };
+      es.onerror = () => setLive(false);
+    };
+
+    api<LobbyData>('/api/lobby').then((l) => setLobby((prev) => prev ?? l), () => {});
+    void catchUp();
+    connect();
+    const tick = setInterval(() => {
+      if (document.hidden) return;
+      void catchUp();
+      if (Date.now() - heard > 40_000) connect();
+    }, 10_000);
+    const onVisible = () => {
+      if (document.hidden) return;
+      void catchUp();
+      if (Date.now() - heard > 40_000) connect();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(tick);
+      document.removeEventListener('visibilitychange', onVisible);
+      es?.close();
+    };
+  }, [catchUp, merge]);
+
+  /** The message shows up at once as "sending"; it is replaced by the stored one or marked failed. */
+  const send = useCallback(
+    async (text: string, retryOf?: number) => {
+      const temp = retryOf ?? -Date.now();
+      const draft: Message = { id: temp, userId: me.id, name: me.name, avatar: me.avatar, text, at: Date.now(), status: 'sending' };
+      setMessages((prev) => (retryOf ? prev.map((m) => (m.id === retryOf ? draft : m)) : [...prev, draft]));
+      try {
+        const saved = await api<Message>('/api/chat', { method: 'POST', body: { text } });
+        setMessages((prev) => prev.filter((m) => m.id !== temp));
+        merge([saved]);
+      } catch (e) {
+        const error = e instanceof ApiError ? e.message : 'Нет связи';
+        setMessages((prev) => prev.map((m) => (m.id === temp ? { ...m, status: 'failed', error } : m)));
+      }
+    },
+    [me, merge],
+  );
   const remove = useCallback((id: number) => void api(`/api/admin/chat/${id}`, { method: 'DELETE' }).catch(() => {}), []);
 
   if (!lobby) return <p className="px-5 py-16 text-center font-display text-2xl italic text-frost">Накрываем на стол…</p>;
@@ -123,11 +182,6 @@ export function Lobby({ me }: { me: Me }) {
       </div>
 
       <div>
-        {chatError && (
-          <div className="mb-3 hidden lg:block">
-            <Notice tone="error">{chatError}</Notice>
-          </div>
-        )}
         <Chat ready={chatReady} messages={messages} meId={me.id} canDelete={me.isAdmin} onSend={send} onDelete={remove} />
       </div>
     </div>

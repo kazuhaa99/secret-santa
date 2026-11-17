@@ -10,6 +10,9 @@ export interface Message {
   avatar: number | null;
   text: string;
   at: number;
+  /** only on this device, until the server confirms */
+  status?: 'sending' | 'failed';
+  error?: string;
 }
 
 const time = (at: number) => new Date(at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -24,11 +27,10 @@ function Thread({
   messages: Message[];
   meId: number;
   canDelete: boolean;
-  onSend: (text: string) => Promise<boolean>;
+  onSend: (text: string, retryOf?: number) => Promise<void>;
   onDelete: (id: number) => void;
 }) {
   const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
   const list = useRef<HTMLOListElement>(null);
   const stick = useRef(true);
 
@@ -38,13 +40,12 @@ function Thread({
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  async function submit(e: FormEvent) {
+  function submit(e: FormEvent) {
     e.preventDefault();
-    if (!text.trim() || busy) return;
-    setBusy(true);
+    if (!text.trim()) return;
     stick.current = true;
-    if (await onSend(text.trim())) setText('');
-    setBusy(false);
+    void onSend(text.trim());
+    setText('');
   }
 
   return (
@@ -65,17 +66,32 @@ function Thread({
           return (
             <li key={m.id} className={cn('group flex items-end gap-2', mine && 'flex-row-reverse')}>
               <Avatar id={m.userId} name={m.name} avatar={m.avatar} className="size-7 shrink-0 text-[11px]" />
-              <div className={cn('max-w-[78%] rounded-2xl px-3 py-2', mine ? 'rounded-br-sm bg-[#e9dcc0] text-night' : 'rounded-bl-sm bg-night-3 text-snow')}>
+              <div
+                className={cn(
+                  'max-w-[78%] rounded-2xl px-3 py-2 transition-opacity',
+                  mine ? 'rounded-br-sm bg-[#e9dcc0] text-night' : 'rounded-bl-sm bg-night-3 text-snow',
+                  m.status === 'sending' && 'opacity-60',
+                  m.status === 'failed' && 'ring-1 ring-danger',
+                )}
+              >
                 <p className={cn('mb-0.5 flex items-baseline gap-2 text-[12px]', mine ? 'text-[#6b5530]' : 'text-frost')}>
                   {!mine && <span className="font-display text-[15px] italic text-gold">{m.name}</span>}
-                  <time className="tnum">{time(m.at)}</time>
-                  {canDelete && (
+                  {m.status === 'sending' ? <span>отправляется…</span> : m.status === 'failed' ? null : <time className="tnum">{time(m.at)}</time>}
+                  {canDelete && m.id > 0 && (
                     <button type="button" onClick={() => onDelete(m.id)} className="opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100" aria-label="Удалить сообщение">
                       <Trash2 className="size-3.5" aria-hidden />
                     </button>
                   )}
                 </p>
                 <p className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.text}</p>
+                {m.status === 'failed' && (
+                  <p className="mt-1 text-[12px] text-[#a3321f]">
+                    Не отправлено{m.error ? `: ${m.error}` : ''}.{' '}
+                    <button type="button" className="font-semibold underline underline-offset-2" onClick={() => void onSend(m.text, m.id)}>
+                      Повторить
+                    </button>
+                  </p>
+                )}
               </div>
             </li>
           );
@@ -92,7 +108,7 @@ function Thread({
         />
         <button
           type="submit"
-          disabled={!text.trim() || busy}
+          disabled={!text.trim()}
           className="grid size-11 shrink-0 place-items-center rounded-full bg-[linear-gradient(180deg,#e6c77f,#c9a456)] text-night transition-[transform,filter] active:scale-95 disabled:opacity-40"
           aria-label="Отправить"
         >
@@ -116,12 +132,12 @@ export function Chat({
   messages: Message[];
   meId: number;
   canDelete: boolean;
-  onSend: (text: string) => Promise<boolean>;
+  onSend: (text: string, retryOf?: number) => Promise<void>;
   onDelete: (id: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [seenId, setSeenId] = useState<number | null>(null);
-  const lastId = props.messages.at(-1)?.id ?? 0;
+  const lastId = Math.max(0, ...props.messages.map((m) => m.id));
   useEffect(() => {
     if (ready && seenId === null) setSeenId(lastId);
   }, [ready, seenId, lastId]);
